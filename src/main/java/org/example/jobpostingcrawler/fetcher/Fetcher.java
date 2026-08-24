@@ -5,15 +5,21 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.WaitUntilState;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.springframework.stereotype.Service;
 
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class Fetcher {
 
-    public static Document getDocument(String url) {
+    private ObjectMapper objectMapper;
+
+    public Document getDocument(String url) {
 
         Playwright playwright = Playwright.create();
 
@@ -49,7 +55,7 @@ public class Fetcher {
         return Jsoup.parse(html, url);
     }
 
-    public static JsonNode extractJosPosting(Document doc) {
+    public JsonNode extractJosPosting(Document doc) {
 
 //        Document doc = getDocument(
 ////                "https://www.topcv.vn/viec-lam/ke-toan-kho-uu-tien-nganh-san-xuat-luong-cung-8-11trieu-thang-di-lam-ngay-ha-noi/2211976.html?ta_source=BoxFeatureJob_LinkDetail"
@@ -60,17 +66,15 @@ public class Fetcher {
 //                "https://www.topcv.vn/viec-lam/junior-fullstack-developer-nestjs-reactjs/2246269.html"
 //        );
 
-        ObjectMapper mapper = new ObjectMapper();
-
         for (Element script : doc.select("script[type=application/ld+json]")) {
             try {
-                JsonNode node = mapper.readTree(script.data());
+                JsonNode node = objectMapper.readTree(script.data());
 
                 if ("JobPosting".equals(node.path("@type").asText())) {
                     return node;
                 }
             } catch (JsonProcessingException e) {
-                log.error("Invalid JSON, continue ...");
+                log.warn("Invalid JSON, continue ...");
             }
         }
         return null;
