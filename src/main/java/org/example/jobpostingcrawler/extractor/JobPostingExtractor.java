@@ -1,8 +1,10 @@
-package org.example.jobpostingcrawler.parser;
+package org.example.jobpostingcrawler.extractor;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.model.JobPosting;
+import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -17,7 +19,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Slf4j
-public class Parser {
+@Service
+@RequiredArgsConstructor
+public class JobPostingExtractor {
     private static final Pattern SALARY_NUMBER = Pattern.compile("\\d[\\d.,]*");
 
     public JobPosting parseJobPosting(JsonNode jobPostingJson, String url) {
@@ -37,16 +41,15 @@ public class Parser {
                 .url(url)
                 .companyName(text(organization, "name"))
                 .companyLogoUrl(text(organization, "logo"))
-
                 .title(text(jobPostingJson, "title"))
                 .description(text(jobPostingJson, "description"))
                 .experienceMonths(parseExperienceMonths(jobPostingJson.path("experienceRequirements")))
                 .employmentType(text(jobPostingJson, "employmentType"))
                 .postedDate(parseDate(text(jobPostingJson, "datePosted")))
                 .expiredDate(parseDate(text(jobPostingJson, "validThrough")))
-                .province(firstNonBlank(text(address, "addressRegion"), text(address, "addressLocality")))
-                .district(text(address, "addressLocality"))
-                .street(text(address, "streetAddress"))
+                //TODO.province(firstNonBlank(text(address, "addressRegion"), text(address, "addressLocality")))
+                //TODO.district(text(address, "addressLocality"))
+                //TODO.street(text(address, "streetAddress"))
                 .minSalary(salaryRange.isEmpty() ? null : salaryRange.get(0))
                 .maxSalary(salaryRange.size() < 2 ? (salaryRange.isEmpty() ? null : salaryRange.get(0)) : salaryRange.get(1))
                 .currency(text(salary, "currency"))
