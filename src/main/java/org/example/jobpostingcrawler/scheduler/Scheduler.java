@@ -27,7 +27,7 @@ public class Scheduler {
           "${crawler.scheduler.seed-interval:30m}"
   )
   public void scheduleSeeds() {
-    log.debug("(scheduleSeeds) start");
+    log.info("(scheduleSeeds) start");
 
     properties.sources()
         .stream()
@@ -42,6 +42,6 @@ public class Scheduler {
         )
         .forEach(queueService::push);
 
-    log.debug("(scheduleSeeds) success");
+    log.info("(scheduleSeeds) success");
   }
 }
