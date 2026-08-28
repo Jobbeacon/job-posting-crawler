@@ -9,6 +9,8 @@ import java.util.List;
 public record CrawlerProperties(
     SchedulerProperties scheduler,
     QueueProperties queue,
+    WorkerProperties worker,
+    RabbitProperties rabbitmq,
     List<SourceProperties> sources
 ) {
 
@@ -20,6 +22,20 @@ public record CrawlerProperties(
 
   public record QueueProperties(
       Duration dedupTtl
+  ) {
+  }
+
+  public record WorkerProperties(
+      boolean enabled,
+      int poolSize,
+      Duration idleInterval
+  ) {
+  }
+
+  public record RabbitProperties(
+      String exchange,
+      String queue,
+      String routingKey
   ) {
   }
 
