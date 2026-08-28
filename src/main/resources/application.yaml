@@ -1,3 +1,28 @@
 spring:
   application:
     name: job-posting-crawler
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+crawler:
+  scheduler:
+    enabled: true
+    seed-interval: 30m
+
+  queue:
+    dedup-ttl: 1h
+
+  sources:
+    - name: TOPCV
+      enabled: true
+      seeds:
+        - https://www.topcv.vn/viec-lam
+
+    - name: ITVIEC
+      enabled: true
+      seeds:
+        - https://itviec.com/it-jobs
