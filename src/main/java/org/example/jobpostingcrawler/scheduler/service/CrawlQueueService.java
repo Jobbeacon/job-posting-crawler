@@ -1,4 +1,4 @@
-package org.example.jobpostingcrawler.service;
+package org.example.jobpostingcrawler.scheduler.service;
 
 import org.example.jobpostingcrawler.model.CrawlUrl;
 

@@ -1,9 +1,9 @@
-package org.example.jobpostingcrawler.service.impl;
+package org.example.jobpostingcrawler.scheduler.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.model.CrawlUrl;
-import org.example.jobpostingcrawler.service.CrawlQueueService;
+import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
