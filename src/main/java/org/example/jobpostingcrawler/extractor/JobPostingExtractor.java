@@ -1,6 +1,8 @@
 package org.example.jobpostingcrawler.extractor;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.model.JobPosting;
@@ -36,6 +38,19 @@ public class JobPostingExtractor {
         JsonNode salaryValue = salary.path("value");
         String salaryText = text(salaryValue, "value");
         List<Long> salaryRange = parseSalaryRange(salaryText);
+        Long minSalary = salaryRange.isEmpty() ? null : salaryRange.get(0);
+        Long maxSalary = salaryRange.size() < 2 ? (salaryRange.isEmpty() ? null : salaryRange.get(0)) : salaryRange.get(1);
+
+        if (minSalary == null && maxSalary == null) {
+            JsonNode minNode = salaryValue.path("minValue");
+            if (!minNode.isMissingNode() && !minNode.isNull()) {
+                minSalary = minNode.asLong();
+            }
+            JsonNode maxNode = salaryValue.path("maxValue");
+            if (!maxNode.isMissingNode() && !maxNode.isNull()) {
+                maxSalary = maxNode.asLong();
+            }
+        }
 
         return JobPosting.builder()
                 .url(url)
@@ -47,11 +62,11 @@ public class JobPostingExtractor {
                 .employmentType(text(jobPostingJson, "employmentType"))
                 .postedDate(parseDate(text(jobPostingJson, "datePosted")))
                 .expiredDate(parseDate(text(jobPostingJson, "validThrough")))
-                //TODO.province(firstNonBlank(text(address, "addressRegion"), text(address, "addressLocality")))
-                //TODO.district(text(address, "addressLocality"))
-                //TODO.street(text(address, "streetAddress"))
-                .minSalary(salaryRange.isEmpty() ? null : salaryRange.get(0))
-                .maxSalary(salaryRange.size() < 2 ? (salaryRange.isEmpty() ? null : salaryRange.get(0)) : salaryRange.get(1))
+                .province(firstNonBlank(text(address, "addressRegion"), text(address, "addressLocality")))
+                .district(text(address, "addressLocality"))
+                .street(text(address, "streetAddress"))
+                .minSalary(minSalary)
+                .maxSalary(maxSalary)
                 .currency(text(salary, "currency"))
                 .salaryPeriod(parseSalaryPeriod(salaryText, text(salaryValue, "unitText")))
                 .industry(text(jobPostingJson, "industry"))
@@ -161,4 +176,5 @@ public class JobPostingExtractor {
         String normalized = node.asText().toLowerCase(Locale.ROOT);
         return normalized.contains("year") || normalized.contains("n\u0103m") ? amount * 12 : amount;
     }
+
 }
