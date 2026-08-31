@@ -2,6 +2,18 @@ spring:
   application:
     name: job-posting-crawler
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
 crawler:
   extractor:
     html:
@@ -14,3 +26,30 @@ crawler:
           location: "//svg[use[contains(@href,'#map-pin')]]/following-sibling::span[contains(@class,'text-rich-grey')][1]"
           industry: "//div[normalize-space(.)='Job Domain:']/following-sibling::div[1]"
           skills: "//div[normalize-space(.)='Skills:']/following-sibling::div[1]"
+  scheduler:
+    enabled: true
+    seed-interval: 30m
+
+  worker:
+    enabled: true
+    pool-size: ${CRAWLER_WORKER_POOL_SIZE:4}
+    idle-interval: 5s
+
+  queue:
+    dedup-ttl: 7d
+
+  rabbitmq:
+    exchange: job-posting
+    queue: job-posting.parsed
+    routing-key: job-posting.parsed
+
+  sources:
+    - name: TOPCV
+      enabled: true
+      seeds:
+        - https://www.topcv.vn/viec-lam
+
+    - name: ITVIEC
+      enabled: true
+      seeds:
+        - https://itviec.com/it-jobs
