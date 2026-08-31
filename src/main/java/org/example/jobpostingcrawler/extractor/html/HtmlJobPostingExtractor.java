@@ -3,24 +3,20 @@ package org.example.jobpostingcrawler.extractor.html;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.HtmlExtractorProperties;
-import org.example.jobpostingcrawler.extractor.JobPostingExtractor;
 import org.example.jobpostingcrawler.model.JobPosting;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
 
 @Slf4j
 @Service
-@Order(2)
 @RequiredArgsConstructor
-public class HtmlJobPostingExtractor extends JobPostingExtractor {
+public class HtmlJobPostingExtractor {
     private final HtmlExtractorProperties properties;
 
-    @Override
     public JobPosting extract(Document doc, String url) {
         if (doc == null || url == null) {
             log.warn("Cannot parse a null document or url");
@@ -49,13 +45,6 @@ public class HtmlJobPostingExtractor extends JobPostingExtractor {
         String employmentType = extractByXpath(doc, config.getEmploymentType());
         String postedDate = extractByXpath(doc, config.getPostedDate());
         String expiredDate = extractByXpath(doc, config.getExpiredDate());
-        String province = extractByXpath(doc, config.getProvince());
-        String district = extractByXpath(doc, config.getDistrict());
-        String street = extractByXpath(doc, config.getStreet());
-        String minSalaryStr = extractByXpath(doc, config.getMinSalary());
-        String maxSalaryStr = extractByXpath(doc, config.getMaxSalary());
-        String currency = extractByXpath(doc, config.getCurrency());
-        String salaryPeriod = extractByXpath(doc, config.getSalaryPeriod());
         String industry = extractByXpath(doc, config.getIndustry());
         String skills = extractByXpath(doc, config.getSkills());
         String benefits = extractByXpath(doc, config.getBenefits());
@@ -67,15 +56,8 @@ public class HtmlJobPostingExtractor extends JobPostingExtractor {
                 .companyLogoUrl(companyLogoUrl)
                 .description(description)
                 .employmentType(employmentType)
-                .province(province)
-                .district(district)
-                .street(street)
-                .currency(currency)
-                .salaryPeriod(salaryPeriod)
                 .industry(industry)
                 .benefits(benefits)
-                .minSalary(parseLong(minSalaryStr))
-                .maxSalary(parseLong(maxSalaryStr))
                 .build();
     }
 

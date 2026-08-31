@@ -4,11 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.jobpostingcrawler.extractor.JobPostingExtractor;
 import org.example.jobpostingcrawler.model.JobPosting;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -25,14 +23,12 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Service
-@Order(1)
 @RequiredArgsConstructor
-public class JsonLdJobPostingExtractor extends JobPostingExtractor {
+public class JsonLdJobPostingExtractor {
 
     private final ObjectMapper objectMapper;
     private static final Pattern SALARY_NUMBER = Pattern.compile("\\d[\\d.,]*");
 
-    @Override
     public JobPosting extract(Document doc, String url) {
         if (doc == null) {
             log.warn("Cannot extract from a null document");
