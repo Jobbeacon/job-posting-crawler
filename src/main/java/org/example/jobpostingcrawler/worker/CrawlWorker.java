@@ -102,8 +102,9 @@ public class CrawlWorker {
         JobPosting jobPosting = jobPostingExtractor.extract(document, url);
         if (jobPosting != null) {
             jobPostingPublisher.push(jobPosting);
-            cacheService.markSeen(url);
         }
+
+        cacheService.markSeen(url);
 
         List<String> extractedUrls = urlExtractor.extractUrls(document);
         int nextDepth = crawlUrl.depth() + 1;

@@ -16,9 +16,21 @@ public class JobPostingExtractor {
 
     public JobPosting extract(Document doc, String url) {
         JobPosting jobPosting = jsonLdExtractor.extract(doc, url);
-        if (jobPosting != null) {
-            return jobPosting;
+        if (jobPosting == null) {
+            jobPosting = htmlExtractor.extract(doc, url);
         }
-        return htmlExtractor.extract(doc, url);
+
+        if (jobPosting == null
+                || isBlank(jobPosting.getTitle())
+                || isBlank(jobPosting.getDescription())
+                || isBlank(jobPosting.getLocation())) {
+            return null;
+        }
+
+        return jobPosting;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
