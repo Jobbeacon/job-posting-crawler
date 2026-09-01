@@ -16,8 +16,10 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -84,9 +86,10 @@ public class JsonLdJobPostingExtractor {
                 .employmentType(text(jobPostingJson, "employmentType"))
                 .postedDate(parseDate(text(jobPostingJson, "datePosted")))
                 .expiredDate(parseDate(text(jobPostingJson, "validThrough")))
-                .province(firstNonBlank(text(address, "addressRegion"), text(address, "addressLocality")))
-                .district(text(address, "addressLocality"))
-                .street(text(address, "streetAddress"))
+                .location(joinLocation(
+                        text(address, "streetAddress"),
+                        text(address, "addressLocality"),
+                        text(address, "addressRegion")))
                 .minSalary(minSalary)
                 .maxSalary(maxSalary)
                 .currency(text(salary, "currency"))
@@ -106,8 +109,26 @@ public class JsonLdJobPostingExtractor {
         return result.isEmpty() ? null : result;
     }
 
-    private String firstNonBlank(String first, String second) {
-        return first != null ? first : second;
+    private String joinLocation(String street, String district, String province) {
+        List<String> parts = new ArrayList<>();
+        Set<String> joinedWords = new HashSet<>();
+
+        for (String value : new String[]{street, district, province}) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+
+            Set<String> words = new HashSet<>(Arrays.asList(
+                    value.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+")));
+            words.remove("");
+
+            if (joinedWords.stream().noneMatch(words::contains)) {
+                parts.add(value);
+                joinedWords.addAll(words);
+            }
+        }
+
+        return parts.isEmpty() ? null : String.join(", ", parts);
     }
 
     private LocalDateTime parseDate(String value) {

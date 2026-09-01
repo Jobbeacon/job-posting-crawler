@@ -61,7 +61,7 @@ public class HtmlJobPostingExtractor {
                 .companyLogoUrl(companyLogoUrl)
                 .description(description)
                 .employmentType(employmentType)
-                .street(location)
+                .location(location)
                 .industry(industry)
                 .skills(skills)
                 .benefits(benefits)

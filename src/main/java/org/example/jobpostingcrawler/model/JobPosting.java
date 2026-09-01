@@ -18,9 +18,7 @@ public class JobPosting {
     private String employmentType;
     private LocalDateTime postedDate;
     private LocalDateTime expiredDate;
-    private String province;
-    private String district;
-    private String street;
+    private String location;
     private Long minSalary;
     private Long maxSalary;
     private String currency;
@@ -42,9 +40,7 @@ public class JobPosting {
               employmentType=%s
               postedDate=%s
               expiredDate=%s
-              province=%s
-              district=%s
-              street=%s
+              location=%s
               minSalary=%s
               maxSalary=%s
               currency=%s
@@ -63,9 +59,7 @@ public class JobPosting {
                 employmentType,
                 postedDate,
                 expiredDate,
-                province,
-                district,
-                street,
+                location,
                 minSalary,
                 maxSalary,
                 currency,
