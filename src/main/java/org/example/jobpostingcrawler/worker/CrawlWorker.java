@@ -99,10 +99,14 @@ public class CrawlWorker {
         }
 
         var document = fetcher.getDocument(url);
-        JobPosting jobPosting = jobPostingExtractor.extract(document, url);
-        if (jobPosting != null) {
-            jobPostingPublisher.push(jobPosting);
-            cacheService.markSeen(url);
+        if (isJobPageUrl(url)) {
+            JobPosting jobPosting = jobPostingExtractor.extract(document, url);
+            if (jobPosting != null) {
+                jobPostingPublisher.push(jobPosting);
+                cacheService.markSeen(url);
+            } else {
+                //TODO: call LLM
+            }
         }
 
         List<String> extractedUrls = urlExtractor.extractUrls(document);
@@ -114,5 +118,17 @@ public class CrawlWorker {
             queueService.push(new CrawlUrl(extractedUrl, nextDepth));
         }
         return true;
+    }
+
+    private boolean isJobPageUrl(String url) {
+        if (properties.sources() == null) {
+            return false;
+        }
+
+        return properties.sources().stream()
+                .filter(CrawlerProperties.SourceProperties::enabled)
+                .map(CrawlerProperties.SourceProperties::jobPageUrlPrefix)
+                .filter(prefix -> prefix != null && !prefix.isBlank())
+                .anyMatch(url::startsWith);
     }
 }
