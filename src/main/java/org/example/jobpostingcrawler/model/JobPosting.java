@@ -26,6 +26,7 @@ public class JobPosting {
     private String industry;
     private List<String> skills;
     private String benefits;
+    private LocalDateTime crawledAt;
 
     @Override
     public String toString() {
@@ -48,6 +49,7 @@ public class JobPosting {
               industry=%s
               skills=%s
               benefits=%s
+              crawledAt=%s
             }
             """.formatted(
                 url,
@@ -66,7 +68,8 @@ public class JobPosting {
                 salaryPeriod,
                 industry,
                 skills,
-                benefits
+                benefits,
+                crawledAt
         );
     }
 }
