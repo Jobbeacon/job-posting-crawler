@@ -42,7 +42,8 @@ public record CrawlerProperties(
   public record SourceProperties(
       String name,
       boolean enabled,
-      List<String> seeds
+      List<String> seeds,
+      String jobPageUrlPrefix
   ) {
   }
 }
