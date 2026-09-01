@@ -23,7 +23,7 @@ crawler:
           company-name: "//div[@class='employer-name']"
           company-logo-url: "//img[contains(@class, 'employer-logo')]/@src"
           description: "//section[contains(@class, 'job-content')]"
-          location: "//svg[use[contains(@href,'#map-pin')]]/following-sibling::span[contains(@class,'text-rich-grey')][1]"
+          location: "//*[local-name()='svg'][*[local-name()='use' and contains(@href,'#map-pin')]]/following-sibling::span[contains(@class,'text-rich-grey')][1]"
           industry: "//div[normalize-space(.)='Job Domain:']/following-sibling::div[1]"
           skills: "//div[normalize-space(.)='Skills:']/following-sibling::div[1]"
   scheduler:
@@ -32,7 +32,7 @@ crawler:
 
   worker:
     enabled: true
-    pool-size: ${CRAWLER_WORKER_POOL_SIZE:4}
+    pool-size: ${CRAWLER_WORKER_POOL_SIZE:1}
     idle-interval: 5s
 
   queue:

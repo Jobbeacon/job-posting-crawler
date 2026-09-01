@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.HtmlExtractorProperties;
 import org.example.jobpostingcrawler.model.JobPosting;
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -45,8 +47,11 @@ public class HtmlJobPostingExtractor {
         String employmentType = extractByXpath(doc, config.getEmploymentType());
         String postedDate = extractByXpath(doc, config.getPostedDate());
         String expiredDate = extractByXpath(doc, config.getExpiredDate());
-        String industry = extractByXpath(doc, config.getIndustry());
-        String skills = extractByXpath(doc, config.getSkills());
+        String location = extractByXpath(doc, config.getLocation());
+        String salary = extractByXpath(doc, config.getSalary());
+        List<String> industryTexts = extractChildTexts(doc, config.getIndustry());
+        String industry = industryTexts == null ? null : String.join(", ", industryTexts);
+        List<String> skills = extractChildTexts(doc, config.getSkills());
         String benefits = extractByXpath(doc, config.getBenefits());
 
         return JobPosting.builder()
@@ -56,7 +61,9 @@ public class HtmlJobPostingExtractor {
                 .companyLogoUrl(companyLogoUrl)
                 .description(description)
                 .employmentType(employmentType)
+                .street(location)
                 .industry(industry)
+                .skills(skills)
                 .benefits(benefits)
                 .build();
     }
@@ -70,6 +77,27 @@ public class HtmlJobPostingExtractor {
             log.warn("Invalid url: {}", url);
             return null;
         }
+    }
+
+    private List<String> extractChildTexts(Document doc, String xpath) {
+        String html = extractByXpath(doc, xpath);
+        if (html == null || html.isEmpty()) {
+            return null;
+        }
+
+        Element container = Jsoup.parseBodyFragment(html).body();
+        Elements tags = container.children();
+        if (tags.isEmpty()) {
+            return null;
+        }
+
+        List<String> texts = tags.stream()
+                .map(Element::text)
+                .map(String::trim)
+                .filter(text -> !text.isEmpty())
+                .toList();
+
+        return texts.isEmpty() ? null : texts;
     }
 
     private String extractByXpath(Document doc, String xpath) {
@@ -96,17 +124,5 @@ public class HtmlJobPostingExtractor {
             log.warn("Error evaluating xpath: {}", xpath, e);
         }
         return null;
-    }
-
-    private Long parseLong(String val) {
-        if (val == null || val.isEmpty()) return null;
-        try {
-            // Lọc chỉ lấy số
-            String num = val.replaceAll("[^0-9]", "");
-            if (num.isEmpty()) return null;
-            return Long.parseLong(num);
-        } catch (Exception e) {
-            return null;
-        }
     }
 }
