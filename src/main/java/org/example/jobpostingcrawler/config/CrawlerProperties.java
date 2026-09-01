@@ -28,7 +28,8 @@ public record CrawlerProperties(
   public record WorkerProperties(
       boolean enabled,
       int poolSize,
-      Duration idleInterval
+      Duration idleInterval,
+      int maxDepth
   ) {
   }
 

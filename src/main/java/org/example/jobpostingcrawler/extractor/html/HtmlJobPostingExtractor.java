@@ -4,13 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.HtmlExtractorProperties;
 import org.example.jobpostingcrawler.model.JobPosting;
+import org.example.jobpostingcrawler.utils.UrlUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
 import java.util.List;
 
 @Slf4j
@@ -25,7 +25,7 @@ public class HtmlJobPostingExtractor {
             return null;
         }
 
-        String domain = extractDomain(url);
+        String domain = UrlUtils.extractDomain(url);
         if (domain == null) {
             log.warn("Cannot extract domain from url: {}", url);
             return null;
@@ -66,17 +66,6 @@ public class HtmlJobPostingExtractor {
                 .skills(skills)
                 .benefits(benefits)
                 .build();
-    }
-
-    private String extractDomain(String url) {
-        try {
-            URI uri = new URI(url);
-            String domain = uri.getHost();
-            return domain != null ? domain.startsWith("www.") ? domain.substring(4) : domain : null;
-        } catch (Exception e) {
-            log.warn("Invalid url: {}", url);
-            return null;
-        }
     }
 
     private List<String> extractChildTexts(Document doc, String xpath) {
