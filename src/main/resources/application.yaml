@@ -1,4 +1,10 @@
+server:
+  port: ${PORT:8081}
+
 spring:
+  profiles:
+    active: ${PROFILE_ACTIVE:local}
+
   application:
     name: job-posting-crawler
 
