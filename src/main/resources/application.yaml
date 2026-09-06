@@ -53,12 +53,15 @@ crawler:
   sources:
     - name: TOPCV
       enabled: true
+      delay: 2s
       job-page-url-prefix: https://www.topcv.vn/viec-lam/
       seeds:
         - https://www.topcv.vn/viec-lam
+        - https://www.topcv.vn/tim-viec-lam-nhan-vien-kinh-doanh
 
     - name: ITVIEC
       enabled: true
+      delay: 10s
       job-page-url-prefix: https://itviec.com/it-jobs/
       seeds:
         - https://itviec.com/it-jobs

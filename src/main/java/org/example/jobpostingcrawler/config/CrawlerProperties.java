@@ -44,7 +44,8 @@ public record CrawlerProperties(
       String name,
       boolean enabled,
       List<String> seeds,
-      String jobPageUrlPrefix
+      String jobPageUrlPrefix,
+      Duration delay
   ) {
   }
 }
