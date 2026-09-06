@@ -39,6 +39,7 @@ public class CrawlWorker {
     private final JobPostingExtractor jobPostingExtractor;
     private final UrlExtractor urlExtractor;
     private final JobPostingPublisher jobPostingPublisher;
+    private final DomainDelayService domainDelayService;
 
     private ExecutorService executor;
     private Set<String> allowedDomains = Set.of();
@@ -102,6 +103,8 @@ public class CrawlWorker {
             log.debug("Skip cached url={}", url);
             return true;
         }
+
+        domainDelayService.await(url);
 
         var document = fetcher.getDocument(url);
         if (isJobPageUrl(url)) {
