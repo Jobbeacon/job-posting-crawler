@@ -57,7 +57,6 @@ crawler:
       job-page-url-prefix: https://www.topcv.vn/viec-lam/
       seeds:
         - https://www.topcv.vn/viec-lam
-        - https://www.topcv.vn/tim-viec-lam-nhan-vien-kinh-doanh
 
     - name: ITVIEC
       enabled: true
