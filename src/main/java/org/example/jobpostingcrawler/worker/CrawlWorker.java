@@ -13,12 +13,15 @@ import org.example.jobpostingcrawler.model.CrawlUrl;
 import org.example.jobpostingcrawler.model.JobPosting;
 import org.example.jobpostingcrawler.scheduler.service.CrawlCacheService;
 import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
+import org.example.jobpostingcrawler.utils.UrlUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -36,11 +39,14 @@ public class CrawlWorker {
     private final JobPostingExtractor jobPostingExtractor;
     private final UrlExtractor urlExtractor;
     private final JobPostingPublisher jobPostingPublisher;
+    private final DomainDelayService domainDelayService;
 
     private ExecutorService executor;
+    private Set<String> allowedDomains = Set.of();
 
     @PostConstruct
     public void startWorkers() {
+        allowedDomains = Set.copyOf(loadAllowedDomains());
         int poolSize = properties.worker().poolSize();
         executor = Executors.newFixedThreadPool(poolSize);
         log.info("Starting crawl worker pool with {} threads", poolSize);
@@ -98,17 +104,30 @@ public class CrawlWorker {
             return true;
         }
 
-        var document = fetcher.getDocument(url);
-        cacheService.markSeen(url);
+        domainDelayService.await(url);
 
-        var jobPostingJson = fetcher.extractJosPosting(document);
-        JobPosting jobPosting = jobPostingExtractor.parseJobPosting(jobPostingJson, url);
-        if (jobPosting != null) {
-            jobPostingPublisher.push(jobPosting);
+        var document = fetcher.getDocument(url);
+        if (isJobPageUrl(url)) {
+            JobPosting jobPosting = jobPostingExtractor.extract(document, url);
+            if (jobPosting != null) {
+                jobPostingPublisher.push(jobPosting);
+                cacheService.markSeen(url);
+            } else {
+                //TODO: call LLM
+            }
+        } else {
+            cacheService.markSeen(url);
         }
 
-        List<String> extractedUrls = urlExtractor.extractUrls(document);
+        List<String> extractedUrls = urlExtractor.extractUrls(document).stream()
+                .filter(extractedUrl -> allowedDomains.contains(UrlUtils.extractDomain(extractedUrl)))
+                .toList();
+
         int nextDepth = crawlUrl.depth() + 1;
+        if (nextDepth > properties.worker().maxDepth()) {
+            return true;
+        }
+
         for (String extractedUrl : extractedUrls) {
             if (cacheService.isSeen(extractedUrl)) {
                 continue;
@@ -116,5 +135,40 @@ public class CrawlWorker {
             queueService.push(new CrawlUrl(extractedUrl, nextDepth));
         }
         return true;
+    }
+
+    private Set<String> loadAllowedDomains() {
+        Set<String> domains = new HashSet<>();
+        if (properties.sources() == null) {
+            return domains;
+        }
+
+        properties.sources().stream()
+                .filter(CrawlerProperties.SourceProperties::enabled)
+                .forEach(source -> {
+                    if (source.seeds() != null) {
+                        source.seeds().forEach(seed -> addDomain(domains, seed));
+                    }
+                });
+        return domains;
+    }
+
+    private void addDomain(Set<String> domains, String url) {
+        String domain = UrlUtils.extractDomain(url);
+        if (domain != null) {
+            domains.add(domain);
+        }
+    }
+
+    private boolean isJobPageUrl(String url) {
+        if (properties.sources() == null) {
+            return false;
+        }
+
+        return properties.sources().stream()
+                .filter(CrawlerProperties.SourceProperties::enabled)
+                .map(CrawlerProperties.SourceProperties::jobPageUrlPrefix)
+                .filter(prefix -> prefix != null && !prefix.isBlank())
+                .anyMatch(url::startsWith);
     }
 }

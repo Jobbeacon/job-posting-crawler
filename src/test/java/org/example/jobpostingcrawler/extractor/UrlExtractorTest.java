@@ -218,6 +218,6 @@ class UrlExtractorTest {
     }
 
     private static CrawlerProperties.SourceProperties source(String name, boolean enabled, String seed) {
-        return new CrawlerProperties.SourceProperties(name, enabled, List.of(seed));
+        return new CrawlerProperties.SourceProperties(name, enabled, List.of(seed), null, null);
     }
 }

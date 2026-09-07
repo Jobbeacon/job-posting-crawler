@@ -28,7 +28,8 @@ public record CrawlerProperties(
   public record WorkerProperties(
       boolean enabled,
       int poolSize,
-      Duration idleInterval
+      Duration idleInterval,
+      int maxDepth
   ) {
   }
 
@@ -42,7 +43,9 @@ public record CrawlerProperties(
   public record SourceProperties(
       String name,
       boolean enabled,
-      List<String> seeds
+      List<String> seeds,
+      String jobPageUrlPrefix,
+      Duration delay
   ) {
   }
 }

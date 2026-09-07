@@ -102,10 +102,10 @@ class UrlExtractorRelatedJobTest {
                 null,
                 List.of(
                         new CrawlerProperties.SourceProperties(
-                                "TOPCV", true, List.of("https://www.topcv.vn/viec-lam")
+                                "TOPCV", true, List.of("https://www.topcv.vn/viec-lam"), null, null
                         ),
                         new CrawlerProperties.SourceProperties(
-                                "ITVIEC", true, List.of("https://itviec.com/it-jobs")
+                                "ITVIEC", true, List.of("https://itviec.com/it-jobs"), null, null
                         )
                 )
         );

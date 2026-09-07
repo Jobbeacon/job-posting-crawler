@@ -1,4 +1,10 @@
+server:
+  port: ${PORT:8081}
+
 spring:
+  profiles:
+    active: ${PROFILE_ACTIVE:local}
+
   application:
     name: job-posting-crawler
 
@@ -15,14 +21,26 @@ spring:
     password: ${RABBITMQ_PASSWORD:guest}
 
 crawler:
+  extractor:
+    html:
+      domains:
+        itviec_com:
+          title: "//div[@class='job-header-info']/h1"
+          company-name: "//div[@class='employer-name']"
+          company-logo-url: "//img[contains(@class, 'employer-logo')]/@src"
+          description: "//section[contains(@class, 'job-content')]"
+          location: "//*[local-name()='svg'][*[local-name()='use' and contains(@href,'#map-pin')]]/following-sibling::span[contains(@class,'text-rich-grey')][1]"
+          industry: "//div[normalize-space(.)='Job Domain:']/following-sibling::div[1]"
+          skills: "//div[normalize-space(.)='Skills:']/following-sibling::div[1]"
   scheduler:
     enabled: true
     seed-interval: 30m
 
   worker:
     enabled: true
-    pool-size: ${CRAWLER_WORKER_POOL_SIZE:4}
+    pool-size: ${CRAWLER_WORKER_POOL_SIZE:1}
     idle-interval: 5s
+    max-depth: ${CRAWLER_MAX_DEPTH:5}
 
   queue:
     dedup-ttl: 7d
@@ -35,10 +53,14 @@ crawler:
   sources:
     - name: TOPCV
       enabled: true
+      delay: 2s
+      job-page-url-prefix: https://www.topcv.vn/viec-lam/
       seeds:
         - https://www.topcv.vn/viec-lam
 
     - name: ITVIEC
       enabled: true
+      delay: 10s
+      job-page-url-prefix: https://itviec.com/it-jobs/
       seeds:
         - https://itviec.com/it-jobs
