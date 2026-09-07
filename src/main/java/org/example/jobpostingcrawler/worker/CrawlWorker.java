@@ -99,11 +99,12 @@ public class CrawlWorker {
         }
 
         var document = fetcher.getDocument(url);
+        cacheService.markSeen(url);
+
         var jobPostingJson = fetcher.extractJosPosting(document);
         JobPosting jobPosting = jobPostingExtractor.parseJobPosting(jobPostingJson, url);
         if (jobPosting != null) {
             jobPostingPublisher.push(jobPosting);
-            cacheService.markSeen(url);
         }
 
         List<String> extractedUrls = urlExtractor.extractUrls(document);
