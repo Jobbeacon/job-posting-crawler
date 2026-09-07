@@ -34,9 +34,10 @@ public class DomainDelayService {
     }
 
     for (CrawlerProperties.SourceProperties source : properties.sources()) {
-      if (!source.enabled() || source.delay() == null) continue;
+      if (!source.enabled()) continue;
 
-      long delayMs = source.delay().toMillis();
+      long delayMs = source.delay() != null ? source.delay().toMillis() : 0L;
+
 
       if (source.seeds() != null && !source.seeds().isEmpty()) {
         for (String seed : source.seeds()) {
