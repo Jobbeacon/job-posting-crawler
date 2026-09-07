@@ -115,6 +115,8 @@ public class CrawlWorker {
             } else {
                 //TODO: call LLM
             }
+        } else {
+            cacheService.markSeen(url);
         }
 
         List<String> extractedUrls = urlExtractor.extractUrls(document).stream()
