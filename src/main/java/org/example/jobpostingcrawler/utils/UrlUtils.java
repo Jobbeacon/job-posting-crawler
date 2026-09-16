@@ -21,4 +21,11 @@ public class UrlUtils {
             return null;
         }
     }
+
+    private String stripWww(String host) {
+        if (host == null) {
+            return "";
+        }
+        return host.startsWith("www.") ? host.substring(4) : host;
+    }
 }
