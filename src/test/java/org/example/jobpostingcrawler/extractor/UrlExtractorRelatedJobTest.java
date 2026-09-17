@@ -1,6 +1,5 @@
 package org.example.jobpostingcrawler.extractor;
 
-import org.example.jobpostingcrawler.config.CrawlerProperties;
 import org.example.jobpostingcrawler.fetcher.Fetcher;
 import org.jsoup.nodes.Document;
 import org.junit.jupiter.api.Test;
@@ -44,7 +43,7 @@ class UrlExtractorRelatedJobTest {
                 "Điền JOB_DETAIL_URL (link job detail) rồi chạy lại test"
         );
 
-        UrlExtractor extractor = new UrlExtractor(properties());
+        UrlExtractor extractor = new UrlExtractor();
         Document document = new Fetcher().getDocument(JOB_DETAIL_URL.trim());
         List<String> extracted = extractor.extractUrls(document);
         List<String> relatedJobs = extracted.stream()
@@ -94,20 +93,4 @@ class UrlExtractorRelatedJobTest {
         return uri.getHost() + path;
     }
 
-    private static CrawlerProperties properties() {
-        return new CrawlerProperties(
-                null,
-                null,
-                null,
-                null,
-                List.of(
-                        new CrawlerProperties.SourceProperties(
-                                "TOPCV", true, List.of("https://www.topcv.vn/viec-lam"), null, null
-                        ),
-                        new CrawlerProperties.SourceProperties(
-                                "ITVIEC", true, List.of("https://itviec.com/it-jobs"), null, null
-                        )
-                )
-        );
-    }
 }

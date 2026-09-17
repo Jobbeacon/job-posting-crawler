@@ -10,6 +10,7 @@ import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -144,8 +145,12 @@ public class JsonLdJobPostingExtractor {
                 try {
                     return LocalDateTime.ofInstant(Instant.parse(value), ZoneOffset.UTC);
                 } catch (DateTimeParseException invalidDate) {
-                    log.warn("Invalid job posting date: {}", value);
-                    return null;
+                    try {
+                        return LocalDate.parse(value).atStartOfDay();
+                    } catch (DateTimeParseException finalException) {
+                        log.warn("Invalid job posting date: {}", value);
+                        return null;
+                    }
                 }
             }
         }

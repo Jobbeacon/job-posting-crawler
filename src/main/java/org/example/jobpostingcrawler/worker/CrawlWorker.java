@@ -108,6 +108,7 @@ public class CrawlWorker {
 
         var document = fetcher.getDocument(url);
         if (isJobPageUrl(url)) {
+            log.info("Extract job by url: {}", url);
             JobPosting jobPosting = jobPostingExtractor.extract(document, url);
             if (jobPosting != null) {
                 jobPostingPublisher.push(jobPosting);
@@ -115,6 +116,8 @@ public class CrawlWorker {
             } else {
                 //TODO: call LLM
             }
+        } else {
+            log.info("Url is not a job page: {}", url);
         }
 
         List<String> extractedUrls = urlExtractor.extractUrls(document).stream()
@@ -163,10 +166,13 @@ public class CrawlWorker {
             return false;
         }
 
+        String cleanUrl = UrlUtils.stripWww(url);
+
         return properties.sources().stream()
                 .filter(CrawlerProperties.SourceProperties::enabled)
                 .map(CrawlerProperties.SourceProperties::jobPageUrlPrefix)
                 .filter(prefix -> prefix != null && !prefix.isBlank())
-                .anyMatch(url::startsWith);
+                .map(UrlUtils::stripWww)
+                .anyMatch(cleanUrl::startsWith);
     }
 }

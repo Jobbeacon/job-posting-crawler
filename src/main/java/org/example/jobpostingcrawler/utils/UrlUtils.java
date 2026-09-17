@@ -21,4 +21,11 @@ public class UrlUtils {
             return null;
         }
     }
+
+    public static String stripWww(String url) {
+        if (url == null) {
+            return "";
+        }
+        return url.replaceFirst("^(https?://)?www\\.", "$1");
+    }
 }
