@@ -22,10 +22,10 @@ public class UrlUtils {
         }
     }
 
-    private String stripWww(String host) {
-        if (host == null) {
+    public static String stripWww(String url) {
+        if (url == null) {
             return "";
         }
-        return host.startsWith("www.") ? host.substring(4) : host;
+        return url.replaceFirst("^(https?://)?www\\.", "$1");
     }
 }

@@ -93,21 +93,32 @@ public class HtmlJobPostingExtractor {
         if (xpath == null || xpath.isEmpty()) {
             return null;
         }
+        log.info("Evaluating xpath: {}", xpath);
+        if (xpath.endsWith("/text()")) {
+            log.warn("Warning: Jsoup selectXpath does not support /text() at the end. Please remove it and select the element itself.");
+        }
         try {
             if (xpath.contains("/@")) {
                 int idx = xpath.lastIndexOf("/@");
                 String elementXpath = xpath.substring(0, idx);
                 String attrName = xpath.substring(idx + 2);
+                log.info("Attribute extraction detected. Element XPath: {}, Attribute: {}", elementXpath, attrName);
                 Elements elements = doc.selectXpath(elementXpath);
+                log.info("Found {} elements for Element XPath: {}", elements.size(), elementXpath);
                 if (!elements.isEmpty()) {
-                    return elements.attr(attrName).trim();
+                    String value = elements.attr(attrName).trim();
+                    log.info("Extracted attribute value: {}", value);
+                    return value;
                 }
                 return null;
             }
 
             Elements elements = doc.selectXpath(xpath);
+            log.info("Found {} elements for XPath: {}", elements.size(), xpath);
             if (!elements.isEmpty()) {
-                return elements.html().trim();
+                String value = elements.html().trim();
+                log.info("Extracted html value: {}", value.length() > 200 ? value.substring(0, 200) + "..." : value);
+                return value;
             }
         } catch (Exception e) {
             log.warn("Error evaluating xpath: {}", xpath, e);
