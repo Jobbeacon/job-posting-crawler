@@ -1,7 +1,5 @@
 package org.example.jobpostingcrawler.fetcher;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.WaitUntilState;
@@ -10,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -17,13 +16,16 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class Fetcher {
 
+    @Value("${playwright.headless}")
+    private boolean headless;
+
     private ObjectMapper objectMapper;
 
     public Document getDocument(String url) {
         Playwright playwright = Playwright.create();
         Browser browser = playwright.chromium().launch(
                 new BrowserType.LaunchOptions()
-                        .setHeadless(false)
+                        .setHeadless(headless)
         );
         BrowserContext context = browser.newContext(
                 new Browser.NewContextOptions()

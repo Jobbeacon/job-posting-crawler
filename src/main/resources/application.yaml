@@ -20,6 +20,9 @@ spring:
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
 
+playwright:
+  headless: ${PLAYWRIGHT_HEADLESS:false}
+
 crawler:
   extractor:
     html:
