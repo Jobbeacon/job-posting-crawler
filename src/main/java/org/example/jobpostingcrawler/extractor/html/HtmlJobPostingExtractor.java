@@ -93,7 +93,7 @@ public class HtmlJobPostingExtractor {
         if (xpath == null || xpath.isEmpty()) {
             return null;
         }
-        log.info("Evaluating xpath: {}", xpath);
+        log.debug("Evaluating xpath: {}", xpath);
         if (xpath.endsWith("/text()")) {
             log.warn("Warning: Jsoup selectXpath does not support /text() at the end. Please remove it and select the element itself.");
         }
@@ -102,12 +102,12 @@ public class HtmlJobPostingExtractor {
                 int idx = xpath.lastIndexOf("/@");
                 String elementXpath = xpath.substring(0, idx);
                 String attrName = xpath.substring(idx + 2);
-                log.info("Attribute extraction detected. Element XPath: {}, Attribute: {}", elementXpath, attrName);
+                log.debug("Attribute extraction detected. Element XPath: {}, Attribute: {}", elementXpath, attrName);
                 Elements elements = doc.selectXpath(elementXpath);
-                log.info("Found {} elements for Element XPath: {}", elements.size(), elementXpath);
+                log.debug("Found {} elements for Element XPath: {}", elements.size(), elementXpath);
                 if (!elements.isEmpty()) {
                     String value = elements.attr(attrName).trim();
-                    log.info("Extracted attribute value: {}", value);
+                    log.debug("Extracted attribute value: {}", value);
                     return value;
                 }
                 return null;
@@ -116,7 +116,7 @@ public class HtmlJobPostingExtractor {
             Elements elements = doc.selectXpath(xpath);
             log.info("Found {} elements for XPath: {}", elements.size(), xpath);
             if (!elements.isEmpty()) {
-                String value = elements.html().trim();
+                String value = String.join("|", elements.eachText()).trim();
                 log.info("Extracted html value: {}", value.length() > 200 ? value.substring(0, 200) + "..." : value);
                 return value;
             }
