@@ -4,5 +4,7 @@ public interface CrawlCacheService {
 
     boolean isSeen(String url);
 
-    void markSeen(String url);
+    void markSeenNonJob(String url);
+
+    void markSeenJob(String url);
 }

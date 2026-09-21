@@ -21,7 +21,8 @@ public record CrawlerProperties(
   }
 
   public record QueueProperties(
-      Duration dedupTtl
+      Duration nonJobDedupTtl,
+      Duration jobDedupTtl
   ) {
   }
 

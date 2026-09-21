@@ -46,7 +46,8 @@ crawler:
     max-depth: ${CRAWLER_MAX_DEPTH:5}
 
   queue:
-    dedup-ttl: 7d
+    non-job-dedup-ttl: 7d
+    job-dedup-ttl: 30d
 
   rabbitmq:
     exchange: job-posting

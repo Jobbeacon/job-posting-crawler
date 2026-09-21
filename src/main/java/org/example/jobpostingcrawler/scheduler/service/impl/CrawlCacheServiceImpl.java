@@ -25,10 +25,17 @@ public class CrawlCacheServiceImpl implements CrawlCacheService {
     }
 
     @Override
-    public void markSeen(String url) {
-        Duration ttl = properties.queue().dedupTtl();
+    public void markSeenNonJob(String url) {
+        Duration ttl = properties.queue().nonJobDedupTtl();
         redisTemplate.opsForValue().set(seenKey(url), "1", ttl);
-        log.debug("(markSeen) url={}", url);
+        log.debug("(markSeenNonJob) url={}", url);
+    }
+
+    @Override
+    public void markSeenJob(String url) {
+        Duration ttl = properties.queue().jobDedupTtl();
+        redisTemplate.opsForValue().set(seenKey(url), "1", ttl);
+        log.debug("(markSeenJob) url={}", url);
     }
 
     private String seenKey(String url) {

@@ -18,10 +18,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -112,12 +109,15 @@ public class CrawlWorker {
             JobPosting jobPosting = jobPostingExtractor.extract(document, url);
             if (jobPosting != null) {
                 jobPostingPublisher.push(jobPosting);
-                cacheService.markSeen(url);
+                cacheService.markSeenJob(url);
             } else {
                 //TODO: call LLM
             }
         } else {
             log.info("Url is not a job page: {}", url);
+            if (!isSeedUrl(url)) {
+                cacheService.markSeenNonJob(url);
+            }
         }
 
         List<String> extractedUrls = urlExtractor.extractUrls(document).stream()
@@ -159,6 +159,18 @@ public class CrawlWorker {
         if (domain != null) {
             domains.add(domain);
         }
+    }
+
+    private boolean isSeedUrl(String url) {
+        if (properties.sources() == null) {
+            return false;
+        }
+
+        return properties.sources().stream()
+                .filter(CrawlerProperties.SourceProperties::enabled)
+                .map(CrawlerProperties.SourceProperties::seeds)
+                .filter(Objects::nonNull)
+                .anyMatch(seeds -> seeds.contains(url));
     }
 
     private boolean isJobPageUrl(String url) {
