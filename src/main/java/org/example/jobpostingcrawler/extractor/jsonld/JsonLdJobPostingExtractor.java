@@ -31,6 +31,7 @@ public class JsonLdJobPostingExtractor {
 
     private final ObjectMapper objectMapper;
     private static final Pattern SALARY_NUMBER = Pattern.compile("\\d[\\d.,]*");
+    private static final Set<String> BLANK_TEXT_VALUES = Set.of("not available", "n/a", "na");
 
     public JobPosting extract(Document doc, String url) {
         if (doc == null) {
@@ -58,7 +59,6 @@ public class JsonLdJobPostingExtractor {
         }
 
         JsonNode organization = jobPostingJson.path("hiringOrganization");
-        JsonNode address = jobPostingJson.path("jobLocation").path("address");
         JsonNode salary = jobPostingJson.path("baseSalary");
         JsonNode salaryValue = salary.path("value");
         String salaryText = text(salaryValue, "value");
@@ -87,10 +87,7 @@ public class JsonLdJobPostingExtractor {
                 .employmentType(text(jobPostingJson, "employmentType"))
                 .postedDate(parseDate(text(jobPostingJson, "datePosted")))
                 .expiredDate(parseDate(text(jobPostingJson, "validThrough")))
-                .location(joinLocation(
-                        text(address, "streetAddress"),
-                        text(address, "addressLocality"),
-                        text(address, "addressRegion")))
+                .location(buildLocation(jobPostingJson.path("jobLocation")))
                 .minSalary(minSalary)
                 .maxSalary(maxSalary)
                 .currency(text(salary, "currency"))
@@ -107,7 +104,37 @@ public class JsonLdJobPostingExtractor {
             return null;
         }
         String result = value.asText().trim();
-        return result.isEmpty() ? null : result;
+        if (result.isEmpty() || BLANK_TEXT_VALUES.contains(result.toLowerCase(Locale.ROOT))) {
+            return null;
+        }
+        return result;
+    }
+
+    private String buildLocation(JsonNode jobLocationNode) {
+        if (jobLocationNode.isMissingNode() || jobLocationNode.isNull()) {
+            return null;
+        }
+
+        List<JsonNode> places = new ArrayList<>();
+        if (jobLocationNode.isArray()) {
+            jobLocationNode.forEach(places::add);
+        } else {
+            places.add(jobLocationNode);
+        }
+
+        List<String> locations = new ArrayList<>();
+        for (JsonNode place : places) {
+            JsonNode address = place.path("address");
+            String location = joinLocation(
+                    text(address, "streetAddress"),
+                    text(address, "addressLocality"),
+                    text(address, "addressRegion"));
+            if (location != null && !locations.contains(location)) {
+                locations.add(location);
+            }
+        }
+
+        return locations.isEmpty() ? null : String.join("|", locations);
     }
 
     private String joinLocation(String street, String district, String province) {
