@@ -1,7 +1,5 @@
 package org.example.jobpostingcrawler.worker;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.CrawlerProperties;
@@ -15,6 +13,7 @@ import org.example.jobpostingcrawler.scheduler.service.CrawlCacheService;
 import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
 import org.example.jobpostingcrawler.utils.UrlUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -25,12 +24,13 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "crawler.worker", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class CrawlWorker {
+public class CrawlWorker implements SmartLifecycle {
 
     private final CrawlerProperties properties;
     private final CrawlQueueService queueService;
@@ -41,11 +41,15 @@ public class CrawlWorker {
     private final JobPostingPublisher jobPostingPublisher;
     private final DomainDelayService domainDelayService;
 
+    private final AtomicBoolean running = new AtomicBoolean(false);
     private ExecutorService executor;
     private Set<String> allowedDomains = Set.of();
 
-    @PostConstruct
-    public void startWorkers() {
+    @Override
+    public void start() {
+        if (!running.compareAndSet(false, true)) {
+            return;
+        }
         allowedDomains = Set.copyOf(loadAllowedDomains());
         int poolSize = properties.worker().poolSize();
         executor = Executors.newFixedThreadPool(poolSize);
@@ -56,8 +60,11 @@ public class CrawlWorker {
         }
     }
 
-    @PreDestroy
-    public void stopWorkers() {
+    @Override
+    public void stop() {
+        if (!running.compareAndSet(true, false)) {
+            return;
+        }
         if (executor == null) {
             return;
         }
@@ -71,26 +78,59 @@ public class CrawlWorker {
         }
     }
 
+    @Override
+    public boolean isRunning() {
+        return running.get();
+    }
+
+    // Stop before Redis/RabbitMQ SmartLifecycle beans (default phase 0).
+    @Override
+    public int getPhase() {
+        return Integer.MAX_VALUE;
+    }
+
     private void runCrawlLoop(int workerId) {
         Thread.currentThread().setName("crawl-worker-" + workerId);
         log.info("Crawl worker {} started", workerId);
         Duration idle = properties.worker().idleInterval();
-        while (!Thread.currentThread().isInterrupted()) {
+        while (running.get() && !Thread.currentThread().isInterrupted()) {
             try {
                 boolean crawled = crawlOnce();
                 if (!crawled) {
-                    Thread.sleep(idle.toMillis());
+                    sleepIfRunning(idle);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                break;
             } catch (Exception e) {
+                if (!running.get() || Thread.currentThread().isInterrupted()) {
+                    log.debug("Crawl worker {} exiting during shutdown", workerId);
+                    break;
+                }
                 log.error("Crawl worker {} failed a cycle", workerId, e);
+                try {
+                    sleepIfRunning(idle);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
         log.info("Crawl worker {} stopped", workerId);
     }
 
-    private boolean crawlOnce() {
+    private void sleepIfRunning(Duration idle) throws InterruptedException {
+        if (!running.get()) {
+            return;
+        }
+        Thread.sleep(idle.toMillis());
+    }
+
+    private boolean crawlOnce() throws InterruptedException {
+        if (!running.get()) {
+            return false;
+        }
+
         Optional<CrawlUrl> next = queueService.pop();
         if (next.isEmpty()) {
             return false;
