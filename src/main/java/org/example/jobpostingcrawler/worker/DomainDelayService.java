@@ -53,7 +53,7 @@ public class DomainDelayService {
     log.info("Initialized DomainDelayService with domain delays: {}", domainDelayMap);
   }
 
-  public void await(String url) {
+  public void await(String url) throws InterruptedException {
     String domain = UrlUtils.extractDomain(url);
 
     if (Objects.isNull(domain)) return;
@@ -77,13 +77,7 @@ public class DomainDelayService {
     if (waitMs > 0) {
       log.info("(await) Domain [{}] delay active. Thread sleep for [{}]",
           domain, waitMs);
-
-      try {
-        Thread.sleep(waitMs);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        log.warn("Interrupted while waiting for domain [{}] delay", domain);
-      }
+      Thread.sleep(waitMs);
     }
   }
 
