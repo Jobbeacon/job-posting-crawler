@@ -114,10 +114,10 @@ public class HtmlJobPostingExtractor {
             }
 
             Elements elements = doc.selectXpath(xpath);
-            log.info("Found {} elements for XPath: {}", elements.size(), xpath);
+            log.debug("Found {} elements for XPath: {}", elements.size(), xpath);
             if (!elements.isEmpty()) {
                 String value = String.join("|", elements.eachText()).trim();
-                log.info("Extracted html value: {}", value.length() > 200 ? value.substring(0, 200) + "..." : value);
+                log.debug("Extracted html value: {}", value.length() > 200 ? value.substring(0, 200) + "..." : value);
                 return value;
             }
         } catch (Exception e) {
