@@ -2,9 +2,8 @@ package org.example.jobpostingcrawler.fetcher;
 
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.WaitUntilState;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.example.jobpostingcrawler.exception.FetchException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,29 +16,10 @@ public class Fetcher {
     @Value("${playwright.headless}")
     private boolean headless;
 
-    private Playwright playwright;
-    private Browser browser;
-
-    @PostConstruct
-    public void start() {
-        playwright = Playwright.create();
-        browser = playwright.chromium().launch(
-                new BrowserType.LaunchOptions()
-                        .setHeadless(headless)
-        );
-    }
-
-    @PreDestroy
-    public void stop() {
-        if (browser != null) {
-            browser.close();
-        }
-        if (playwright != null) {
-            playwright.close();
-        }
-    }
+    private final ThreadLocal<PlaywrightResources> resources = new ThreadLocal<>();
 
     public Document getDocument(String url) {
+        Browser browser = getResources().browser;
         try (BrowserContext context = browser.newContext(
                 new Browser.NewContextOptions()
                         .setLocale("vi-VN")
@@ -48,15 +28,54 @@ public class Fetcher {
                         )
         )) {
             Page page = context.newPage();
-            page.navigate(
+            Response response = page.navigate(
                     url,
                     new Page.NavigateOptions()
                             .setWaitUntil(WaitUntilState.DOMCONTENTLOADED)
                             .setTimeout(60_000)
             );
+            if (response != null && response.status() >= 400) {
+                throw new FetchException(url, response.status());
+            }
             page.waitForTimeout(10_000);
             String html = page.content();
             return Jsoup.parse(html, url);
+        }
+    }
+
+    private PlaywrightResources getResources() {
+        PlaywrightResources current = resources.get();
+        if (current == null) {
+            current = new PlaywrightResources(headless);
+            resources.set(current);
+        }
+        return current;
+    }
+
+    public void closeForCurrentThread() {
+        PlaywrightResources current = resources.get();
+        if (current == null) {
+            return;
+        }
+        resources.remove();
+        current.close();
+    }
+
+    private static final class PlaywrightResources {
+        private final Playwright playwright;
+        private final Browser browser;
+
+        private PlaywrightResources(boolean headless) {
+            playwright = Playwright.create();
+            browser = playwright.chromium().launch(
+                    new BrowserType.LaunchOptions()
+                            .setHeadless(headless)
+            );
+        }
+
+        private void close() {
+            browser.close();
+            playwright.close();
         }
     }
 }

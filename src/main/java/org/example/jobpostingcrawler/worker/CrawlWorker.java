@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.CrawlerProperties;
 import org.example.jobpostingcrawler.extractor.JobPostingExtractor;
+import org.example.jobpostingcrawler.exception.FetchException;
 import org.example.jobpostingcrawler.extractor.UrlExtractor;
 import org.example.jobpostingcrawler.fetcher.Fetcher;
 import org.example.jobpostingcrawler.messaging.JobPostingPublisher;
@@ -12,6 +13,7 @@ import org.example.jobpostingcrawler.model.JobPosting;
 import org.example.jobpostingcrawler.scheduler.service.CrawlCacheService;
 import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
 import org.example.jobpostingcrawler.utils.UrlUtils;
+import org.jsoup.nodes.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
@@ -90,28 +92,32 @@ public class CrawlWorker implements SmartLifecycle {
         Thread.currentThread().setName("crawl-worker-" + workerId);
         log.info("Crawl worker {} started", workerId);
         Duration idle = properties.worker().idleInterval();
-        while (running.get() && !Thread.currentThread().isInterrupted()) {
-            try {
-                boolean crawled = crawlOnce();
-                if (!crawled) {
-                    sleepIfRunning(idle);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                if (!running.get() || Thread.currentThread().isInterrupted()) {
-                    log.debug("Crawl worker {} exiting during shutdown", workerId);
-                    break;
-                }
-                log.error("Crawl worker {} failed a cycle", workerId, e);
+        try {
+            while (running.get() && !Thread.currentThread().isInterrupted()) {
                 try {
-                    sleepIfRunning(idle);
-                } catch (InterruptedException interruptedException) {
+                    boolean crawled = crawlOnce();
+                    if (!crawled) {
+                        sleepIfRunning(idle);
+                    }
+                } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
+                } catch (Exception e) {
+                    if (!running.get() || Thread.currentThread().isInterrupted()) {
+                        log.debug("Crawl worker {} exiting during shutdown", workerId);
+                        break;
+                    }
+                    log.error("Crawl worker {} failed a cycle", workerId, e);
+                    try {
+                        sleepIfRunning(idle);
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
             }
+        } finally {
+            fetcher.closeForCurrentThread();
         }
         log.info("Crawl worker {} stopped", workerId);
     }
@@ -143,7 +149,14 @@ public class CrawlWorker implements SmartLifecycle {
 
         domainDelayService.await(url);
 
-        var document = fetcher.getDocument(url);
+        Document document;
+        try {
+            document = fetcher.getDocument(url);
+        } catch (FetchException e) {
+            log.warn("Fetch failed url={} status={}", e.getUrl(), e.getStatusCode());
+            return true;
+        }
+
         if (isJobPageUrl(url)) {
             log.info("Extract job by url: {}", url);
             JobPosting jobPosting = jobPostingExtractor.extract(document, url);
