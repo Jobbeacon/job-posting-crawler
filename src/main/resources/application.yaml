@@ -64,9 +64,9 @@ crawler:
     idle-interval: 5s
     max-depth: ${CRAWLER_MAX_DEPTH:5}
 
-  queue:
+  dedup:
     non-job-dedup-ttl: 7d
-    job-dedup-ttl: 30d
+    job-bloom-filter-name: ${JOB_URL_BLOOM_FILTER_NAME}
 
   rabbitmq:
     exchange: job-posting

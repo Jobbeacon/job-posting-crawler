@@ -8,7 +8,7 @@ import java.util.List;
 @ConfigurationProperties(prefix = "crawler")
 public record CrawlerProperties(
     SchedulerProperties scheduler,
-    QueueProperties queue,
+    DedupProperties dedup,
     WorkerProperties worker,
     RabbitProperties rabbitmq,
     List<SourceProperties> sources
@@ -20,9 +20,9 @@ public record CrawlerProperties(
   ) {
   }
 
-  public record QueueProperties(
+  public record DedupProperties(
       Duration nonJobDedupTtl,
-      Duration jobDedupTtl
+      String jobBloomFilterName
   ) {
   }
 

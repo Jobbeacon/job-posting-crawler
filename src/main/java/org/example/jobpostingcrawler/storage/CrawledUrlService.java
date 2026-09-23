@@ -5,4 +5,6 @@ import java.time.LocalDateTime;
 public interface CrawledUrlService {
 
     void save(String url, LocalDateTime expiredDate);
+
+    boolean exists(String url);
 }

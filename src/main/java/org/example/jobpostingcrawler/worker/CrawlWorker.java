@@ -167,13 +167,12 @@ public class CrawlWorker implements SmartLifecycle {
                 cacheService.markSeenJob(url);
                 jobPostingPublisher.push(jobPosting);
             } else {
-                //TODO: call LLM
+                log.info("Failed to extract job posting, treating as non-job url: {}", url);
+                cacheAsNonJob(url);
             }
         } else {
             log.info("Url is not a job page: {}", url);
-            if (!isSeedUrl(url)) {
-                cacheService.markSeenNonJob(url);
-            }
+            cacheAsNonJob(url);
         }
 
         List<String> extractedUrls = urlExtractor.extractUrls(document).stream()
@@ -214,6 +213,12 @@ public class CrawlWorker implements SmartLifecycle {
         String domain = UrlUtils.extractDomain(url);
         if (domain != null) {
             domains.add(domain);
+        }
+    }
+
+    private void cacheAsNonJob(String url) {
+        if (!isSeedUrl(url)) {
+            cacheService.markSeenNonJob(url);
         }
     }
 

@@ -46,6 +46,11 @@ public class CrawledUrlServiceImpl implements CrawledUrlService {
         log.debug("(save) url={}", url);
     }
 
+    @Override
+    public boolean exists(String url) {
+        return crawledUrlRepository.findByUrlHash(hash(url)).isPresent();
+    }
+
     private String hash(String url) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
