@@ -12,6 +12,7 @@ import org.example.jobpostingcrawler.model.CrawlUrl;
 import org.example.jobpostingcrawler.model.JobPosting;
 import org.example.jobpostingcrawler.scheduler.service.CrawlCacheService;
 import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
+import org.example.jobpostingcrawler.storage.CrawledUrlService;
 import org.example.jobpostingcrawler.utils.UrlUtils;
 import org.jsoup.nodes.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,6 +35,7 @@ public class CrawlWorker implements SmartLifecycle {
     private final CrawlerProperties properties;
     private final CrawlQueueService queueService;
     private final CrawlCacheService cacheService;
+    private final CrawledUrlService crawledUrlService;
     private final Fetcher fetcher;
     private final JobPostingExtractor jobPostingExtractor;
     private final UrlExtractor urlExtractor;
@@ -161,8 +163,9 @@ public class CrawlWorker implements SmartLifecycle {
             log.info("Extract job by url: {}", url);
             JobPosting jobPosting = jobPostingExtractor.extract(document, url);
             if (jobPosting != null) {
-                jobPostingPublisher.push(jobPosting);
+                crawledUrlService.save(url, jobPosting.getExpiredDate());
                 cacheService.markSeenJob(url);
+                jobPostingPublisher.push(jobPosting);
             } else {
                 //TODO: call LLM
             }
