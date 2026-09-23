@@ -20,8 +20,28 @@ spring:
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
 
+  liquibase:
+    enabled: ${LIQUIBASE_ENABLED:true}
+    change-log: classpath:/db/changelog/db.changelog-master.xml
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/job_crawler}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
 playwright:
   headless: ${PLAYWRIGHT_HEADLESS:false}
+  proxies: ${PLAYWRIGHT_PROXIES:}
 
 crawler:
   extractor:
@@ -45,8 +65,9 @@ crawler:
     idle-interval: 5s
     max-depth: ${CRAWLER_MAX_DEPTH:5}
 
-  queue:
-    dedup-ttl: 7d
+  dedup:
+    non-job-dedup-ttl: 7d
+    job-bloom-filter-name: ${JOB_URL_BLOOM_FILTER_NAME}
 
   rabbitmq:
     exchange: job-posting
@@ -56,14 +77,14 @@ crawler:
   sources:
     - name: TOPCV
       enabled: true
-      delay: 30s
+      delay: 3s
       job-page-url-prefix: https://www.topcv.vn/viec-lam/
       seeds:
         - https://www.topcv.vn/viec-lam
 
     - name: ITVIEC
       enabled: true
-      delay: 30s
+      delay: 3s
       job-page-url-prefix: https://itviec.com/it-jobs/
       seeds:
         - https://itviec.com/it-jobs

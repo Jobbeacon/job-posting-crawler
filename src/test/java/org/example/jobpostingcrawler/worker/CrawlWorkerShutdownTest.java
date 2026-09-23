@@ -11,6 +11,7 @@ import org.example.jobpostingcrawler.fetcher.Fetcher;
 import org.example.jobpostingcrawler.messaging.JobPostingPublisher;
 import org.example.jobpostingcrawler.scheduler.service.CrawlCacheService;
 import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
+import org.example.jobpostingcrawler.storage.CrawledUrlService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,8 @@ class CrawlWorkerShutdownTest {
     @Mock
     private CrawlCacheService cacheService;
     @Mock
+    private CrawledUrlService crawledUrlService;
+    @Mock
     private Fetcher fetcher;
     @Mock
     private JobPostingExtractor jobPostingExtractor;
@@ -56,7 +59,7 @@ class CrawlWorkerShutdownTest {
     void setUp() {
         CrawlerProperties properties = new CrawlerProperties(
                 new CrawlerProperties.SchedulerProperties(false, Duration.ofMinutes(30)),
-                new CrawlerProperties.QueueProperties(Duration.ofDays(7)),
+                new CrawlerProperties.DedupProperties(Duration.ofDays(7), "test-bloom-filter"),
                 new CrawlerProperties.WorkerProperties(true, 1, Duration.ofMillis(40), 2),
                 new CrawlerProperties.RabbitProperties("ex", "q", "rk"),
                 List.of()
@@ -65,6 +68,7 @@ class CrawlWorkerShutdownTest {
                 properties,
                 queueService,
                 cacheService,
+                crawledUrlService,
                 fetcher,
                 jobPostingExtractor,
                 urlExtractor,

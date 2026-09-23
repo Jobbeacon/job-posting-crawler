@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.CrawlerProperties;
 import org.example.jobpostingcrawler.extractor.JobPostingExtractor;
+import org.example.jobpostingcrawler.exception.FetchException;
 import org.example.jobpostingcrawler.extractor.UrlExtractor;
 import org.example.jobpostingcrawler.fetcher.Fetcher;
 import org.example.jobpostingcrawler.messaging.JobPostingPublisher;
@@ -11,16 +12,15 @@ import org.example.jobpostingcrawler.model.CrawlUrl;
 import org.example.jobpostingcrawler.model.JobPosting;
 import org.example.jobpostingcrawler.scheduler.service.CrawlCacheService;
 import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
+import org.example.jobpostingcrawler.storage.CrawledUrlService;
 import org.example.jobpostingcrawler.utils.UrlUtils;
+import org.jsoup.nodes.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +35,7 @@ public class CrawlWorker implements SmartLifecycle {
     private final CrawlerProperties properties;
     private final CrawlQueueService queueService;
     private final CrawlCacheService cacheService;
+    private final CrawledUrlService crawledUrlService;
     private final Fetcher fetcher;
     private final JobPostingExtractor jobPostingExtractor;
     private final UrlExtractor urlExtractor;
@@ -93,28 +94,32 @@ public class CrawlWorker implements SmartLifecycle {
         Thread.currentThread().setName("crawl-worker-" + workerId);
         log.info("Crawl worker {} started", workerId);
         Duration idle = properties.worker().idleInterval();
-        while (running.get() && !Thread.currentThread().isInterrupted()) {
-            try {
-                boolean crawled = crawlOnce();
-                if (!crawled) {
-                    sleepIfRunning(idle);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                if (!running.get() || Thread.currentThread().isInterrupted()) {
-                    log.debug("Crawl worker {} exiting during shutdown", workerId);
-                    break;
-                }
-                log.error("Crawl worker {} failed a cycle", workerId, e);
+        try {
+            while (running.get() && !Thread.currentThread().isInterrupted()) {
                 try {
-                    sleepIfRunning(idle);
-                } catch (InterruptedException interruptedException) {
+                    boolean crawled = crawlOnce();
+                    if (!crawled) {
+                        sleepIfRunning(idle);
+                    }
+                } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
+                } catch (Exception e) {
+                    if (!running.get() || Thread.currentThread().isInterrupted()) {
+                        log.debug("Crawl worker {} exiting during shutdown", workerId);
+                        break;
+                    }
+                    log.error("Crawl worker {} failed a cycle", workerId, e);
+                    try {
+                        sleepIfRunning(idle);
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
             }
+        } finally {
+            fetcher.closeForCurrentThread();
         }
         log.info("Crawl worker {} stopped", workerId);
     }
@@ -146,18 +151,28 @@ public class CrawlWorker implements SmartLifecycle {
 
         domainDelayService.await(url);
 
-        var document = fetcher.getDocument(url);
+        Document document;
+        try {
+            document = fetcher.getDocument(url);
+        } catch (FetchException e) {
+            log.warn("Fetch failed url={} status={}", e.getUrl(), e.getStatusCode());
+            return true;
+        }
+
         if (isJobPageUrl(url)) {
             log.info("Extract job by url: {}", url);
             JobPosting jobPosting = jobPostingExtractor.extract(document, url);
             if (jobPosting != null) {
+                crawledUrlService.save(url, jobPosting.getExpiredDate());
+                cacheService.markSeenJob(url);
                 jobPostingPublisher.push(jobPosting);
-                cacheService.markSeen(url);
             } else {
-                //TODO: call LLM
+                log.info("Failed to extract job posting, treating as non-job url: {}", url);
+                cacheAsNonJob(url);
             }
         } else {
             log.info("Url is not a job page: {}", url);
+            cacheAsNonJob(url);
         }
 
         List<String> extractedUrls = urlExtractor.extractUrls(document).stream()
@@ -199,6 +214,24 @@ public class CrawlWorker implements SmartLifecycle {
         if (domain != null) {
             domains.add(domain);
         }
+    }
+
+    private void cacheAsNonJob(String url) {
+        if (!isSeedUrl(url)) {
+            cacheService.markSeenNonJob(url);
+        }
+    }
+
+    private boolean isSeedUrl(String url) {
+        if (properties.sources() == null) {
+            return false;
+        }
+
+        return properties.sources().stream()
+                .filter(CrawlerProperties.SourceProperties::enabled)
+                .map(CrawlerProperties.SourceProperties::seeds)
+                .filter(Objects::nonNull)
+                .anyMatch(seeds -> seeds.contains(url));
     }
 
     private boolean isJobPageUrl(String url) {
