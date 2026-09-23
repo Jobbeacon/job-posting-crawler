@@ -17,10 +17,10 @@ COPY --from=build /build/target/*.jar ./staging/
 RUN find ./staging -maxdepth 1 -name '*.jar' ! -name '*.jar.original' -exec cp {} app.jar \; \
     && rm -rf staging
 
-RUN java -Djarmode=layertools -jar app.jar extract --destination extracted \
+RUN java -Djarmode=tools -jar app.jar extract --destination extracted \
     && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
-    && java -cp "extracted/dependencies/BOOT-INF/lib/*" com.microsoft.playwright.CLI install --with-deps chromium \
+    && java -cp "extracted/lib/*" com.microsoft.playwright.CLI install --with-deps chromium \
     && rm -rf extracted /var/lib/apt/lists/*
 
 EXPOSE 8081
