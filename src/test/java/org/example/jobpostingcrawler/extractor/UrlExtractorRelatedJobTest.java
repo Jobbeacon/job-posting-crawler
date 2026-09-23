@@ -1,6 +1,8 @@
 package org.example.jobpostingcrawler.extractor;
 
+import org.example.jobpostingcrawler.config.PlaywrightProperties;
 import org.example.jobpostingcrawler.fetcher.Fetcher;
+import org.example.jobpostingcrawler.fetcher.ProxyProvider;
 import org.jsoup.nodes.Document;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -44,7 +46,8 @@ class UrlExtractorRelatedJobTest {
         );
 
         UrlExtractor extractor = new UrlExtractor();
-        Document document = new Fetcher().getDocument(JOB_DETAIL_URL.trim());
+        ProxyProvider proxyProvider = new ProxyProvider(new PlaywrightProperties(false, List.of()));
+        Document document = new Fetcher(proxyProvider).getDocument(JOB_DETAIL_URL.trim());
         List<String> extracted = extractor.extractUrls(document);
         List<String> relatedJobs = extracted.stream()
                 .filter(UrlExtractorRelatedJobTest::isJobDetailUrl)

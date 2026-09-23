@@ -41,6 +41,7 @@ spring:
 
 playwright:
   headless: ${PLAYWRIGHT_HEADLESS:false}
+  proxies: ${PLAYWRIGHT_PROXIES:}
 
 crawler:
   extractor:

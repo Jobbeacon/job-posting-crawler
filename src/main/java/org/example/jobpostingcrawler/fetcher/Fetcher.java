@@ -1,7 +1,9 @@
 package org.example.jobpostingcrawler.fetcher;
 
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.Proxy;
 import com.microsoft.playwright.options.WaitUntilState;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.exception.FetchException;
 import org.jsoup.Jsoup;
@@ -11,10 +13,13 @@ import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class Fetcher {
 
     @Value("${playwright.headless}")
     private boolean headless;
+
+    private final ProxyProvider proxyProvider;
 
     private final ThreadLocal<PlaywrightResources> resources = new ThreadLocal<>();
 
@@ -46,13 +51,14 @@ public class Fetcher {
     private PlaywrightResources getResources() {
         PlaywrightResources current = resources.get();
         if (current == null) {
-            current = new PlaywrightResources(headless);
+            current = new PlaywrightResources(headless, proxyProvider.getProxyForCurrentThread());
             resources.set(current);
         }
         return current;
     }
 
     public void closeForCurrentThread() {
+        proxyProvider.clearForCurrentThread();
         PlaywrightResources current = resources.get();
         if (current == null) {
             return;
@@ -65,12 +71,22 @@ public class Fetcher {
         private final Playwright playwright;
         private final Browser browser;
 
-        private PlaywrightResources(boolean headless) {
+        private PlaywrightResources(boolean headless, ProxyConfig proxyConfig) {
             playwright = Playwright.create();
-            browser = playwright.chromium().launch(
-                    new BrowserType.LaunchOptions()
-                            .setHeadless(headless)
-            );
+
+            BrowserType.LaunchOptions options = new BrowserType.LaunchOptions()
+                    .setHeadless(headless);
+            if (proxyConfig != null) {
+                Proxy proxy = new Proxy(proxyConfig.server());
+                if (proxyConfig.hasCredentials()) {
+                    proxy.setUsername(proxyConfig.username()).setPassword(proxyConfig.password());
+                }
+                options.setProxy(proxy);
+                log.info("Crawl thread {} using proxy {}:{}", Thread.currentThread().getName(),
+                        proxyConfig.host(), proxyConfig.port());
+            }
+
+            browser = playwright.chromium().launch(options);
         }
 
         private void close() {
