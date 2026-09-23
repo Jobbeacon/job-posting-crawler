@@ -4,6 +4,8 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.CrawlerProperties;
+import org.example.jobpostingcrawler.fetcher.ProxyConfig;
+import org.example.jobpostingcrawler.fetcher.ProxyProvider;
 import org.example.jobpostingcrawler.utils.UrlUtils;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DomainDelayService {
 
   private final CrawlerProperties properties;
+  private final ProxyProvider proxyProvider;
 
   private final Map<String, Long> domainDelayMap = new ConcurrentHashMap<>();
 
@@ -61,24 +64,31 @@ public class DomainDelayService {
     Long delayMs = domainDelayMap.get(domain);
     if (Objects.isNull(delayMs) || delayMs <= 0) return;
 
-    Object lock = domainLocks.computeIfAbsent(domain, key -> new Object());
+    String proxyKey = proxyKey(proxyProvider.getProxyForCurrentThread());
+    String key = domain + "|" + proxyKey;
+
+    Object lock = domainLocks.computeIfAbsent(key, k -> new Object());
     long waitMs = 0;
 
     synchronized (lock) {
       long now = System.currentTimeMillis();
-      long nextAllowed = nextAllowedTimeMap.getOrDefault(domain, 0L);
+      long nextAllowed = nextAllowedTimeMap.getOrDefault(key, 0L);
 
       long scheduleTime = Math.max(now, nextAllowed);
-      nextAllowedTimeMap.put(domain, scheduleTime + delayMs);
+      nextAllowedTimeMap.put(key, scheduleTime + delayMs);
 
       waitMs = scheduleTime - now;
     }
 
     if (waitMs > 0) {
-      log.info("(await) Domain [{}] delay active. Thread sleep for [{}]",
-          domain, waitMs);
+      log.info("(await) Domain [{}] via proxy [{}] delay active. Thread sleep for [{}]",
+          domain, proxyKey, waitMs);
       Thread.sleep(waitMs);
     }
+  }
+
+  private String proxyKey(ProxyConfig proxyConfig) {
+    return proxyConfig != null ? proxyConfig.host() + ":" + proxyConfig.port() : "direct";
   }
 
   private void registerDomainDelay(String url, long delayMs) {
