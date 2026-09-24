@@ -12,4 +12,6 @@ public interface CrawlQueueService {
   long pushAll(Collection<CrawlUrl> urls);
 
   Optional<CrawlUrl> pop();
+
+  long size();
 }

@@ -70,4 +70,10 @@ public class CrawlQueueServiceImpl implements CrawlQueueService {
         )
     );
   }
+
+  @Override
+  public long size() {
+    Long size = redisTemplate.opsForZSet().zCard(PENDING_KEY);
+    return size != null ? size : 0;
+  }
 }
