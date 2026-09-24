@@ -63,7 +63,10 @@ class CrawlWorkerShutdownTest {
                 new CrawlerProperties.DedupProperties(Duration.ofDays(7), "test-bloom-filter"),
                 new CrawlerProperties.WorkerProperties(true, 1, Duration.ofMillis(40), 2),
                 new CrawlerProperties.RabbitProperties("ex", "q", "rk"),
-                List.of()
+                List.of(),
+                new CrawlerProperties.GeocodeProperties(
+                        false, "", "", Duration.ofSeconds(1), Duration.ofSeconds(5),
+                        Duration.ofDays(180), Duration.ofDays(7))
         );
         worker = new CrawlWorker(
                 properties,
