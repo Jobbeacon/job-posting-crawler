@@ -11,8 +11,7 @@ public record CrawlerProperties(
     DedupProperties dedup,
     WorkerProperties worker,
     RabbitProperties rabbitmq,
-    List<SourceProperties> sources,
-    GeocodeProperties geocode
+    List<SourceProperties> sources
 ) {
 
   public record SchedulerProperties(
@@ -39,17 +38,6 @@ public record CrawlerProperties(
       String exchange,
       String queue,
       String routingKey
-  ) {
-  }
-
-  public record GeocodeProperties(
-      boolean enabled,
-      String baseUrl,
-      String userAgent,
-      Duration minInterval,
-      Duration timeout,
-      Duration positiveTtl,
-      Duration negativeTtl
   ) {
   }
 

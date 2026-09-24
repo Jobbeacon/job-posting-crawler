@@ -83,15 +83,6 @@ crawler:
     queue: job-posting.parsed
     routing-key: job-posting.parsed
 
-  geocode:
-    enabled: true
-    base-url: https://nominatim.openstreetmap.org/search
-    user-agent: job-posting-crawler/1.0 (address normalization)
-    min-interval: 1s
-    timeout: 5s
-    positive-ttl: 180d
-    negative-ttl: 7d
-
   sources:
     - name: TOPCV
       enabled: true
