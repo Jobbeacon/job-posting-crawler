@@ -12,6 +12,7 @@ import org.example.jobpostingcrawler.messaging.JobPostingPublisher;
 import org.example.jobpostingcrawler.scheduler.service.CrawlCacheService;
 import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
 import org.example.jobpostingcrawler.storage.CrawledUrlService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,8 +74,10 @@ class CrawlWorkerShutdownTest {
                 jobPostingExtractor,
                 urlExtractor,
                 jobPostingPublisher,
-                domainDelayService
+                domainDelayService,
+                new SimpleMeterRegistry()
         );
+        worker.registerMetrics();
 
         Logger logger = (Logger) LoggerFactory.getLogger(CrawlWorker.class);
         logAppender = new ListAppender<>();
