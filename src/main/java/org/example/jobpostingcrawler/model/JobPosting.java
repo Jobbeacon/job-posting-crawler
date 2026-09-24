@@ -19,6 +19,7 @@ public class JobPosting {
     private LocalDateTime postedDate;
     private LocalDateTime expiredDate;
     private String location;
+    private String newLocation;
     private Long minSalary;
     private Long maxSalary;
     private String currency;
@@ -42,6 +43,7 @@ public class JobPosting {
               postedDate=%s
               expiredDate=%s
               location=%s
+              newLocation=%s
               minSalary=%s
               maxSalary=%s
               currency=%s
@@ -62,6 +64,7 @@ public class JobPosting {
                 postedDate,
                 expiredDate,
                 location,
+                newLocation,
                 minSalary,
                 maxSalary,
                 currency,
