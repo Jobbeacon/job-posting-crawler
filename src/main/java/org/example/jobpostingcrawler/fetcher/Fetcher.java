@@ -11,6 +11,8 @@ import org.jsoup.nodes.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -76,7 +78,9 @@ public class Fetcher {
             playwright = Playwright.create();
 
             BrowserType.LaunchOptions options = new BrowserType.LaunchOptions()
-                    .setHeadless(headless);
+                    .setHeadless(headless)
+                    .setChannel("chromium")
+                    .setArgs(List.of("--disable-blink-features=AutomationControlled"));
             if (proxyConfig != null) {
                 Proxy proxy = new Proxy(proxyConfig.server());
                 if (proxyConfig.hasCredentials()) {
