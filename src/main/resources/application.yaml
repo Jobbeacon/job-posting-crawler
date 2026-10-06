@@ -76,7 +76,7 @@ crawler:
 
   dedup:
     non-job-dedup-ttl: 7d
-    job-bloom-filter-name: ${JOB_URL_BLOOM_FILTER_NAME}
+    job-bloom-filter-name: ${JOB_URL_BLOOM_FILTER_NAME:crawler:urls}
 
   rabbitmq:
     exchange: job-posting
