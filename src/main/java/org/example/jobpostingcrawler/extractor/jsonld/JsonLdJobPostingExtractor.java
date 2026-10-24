@@ -9,11 +9,13 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,7 +32,12 @@ import java.util.regex.Pattern;
 public class JsonLdJobPostingExtractor {
 
     private final ObjectMapper objectMapper;
-    private static final Pattern SALARY_NUMBER = Pattern.compile("\\d[\\d.,]*");
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final Pattern SALARY_NUMBER = Pattern.compile(
+            "(\\d[\\d.,]*)(?:\\s*(triệu|tr|k|nghìn|ngàn)(?!\\p{L}))?");
+    private static final Pattern SALARY_DECIMAL = Pattern.compile("\\d+[.,]\\d{1,2}");
+    private static final Pattern VND_SALARY = Pattern.compile(
+            "₫|vnd|vnđ|đồng|\\d\\s*(?:đ|triệu|tr)(?!\\p{L})");
     private static final Set<String> BLANK_TEXT_VALUES = Set.of("not available", "n/a", "na");
 
     public JobPosting extract(Document doc, String url) {
@@ -90,7 +97,7 @@ public class JsonLdJobPostingExtractor {
                 .location(buildLocation(jobPostingJson.path("jobLocation")))
                 .minSalary(minSalary)
                 .maxSalary(maxSalary)
-                .currency(text(salary, "currency"))
+                .currency(resolveCurrency(salaryText, text(salary, "currency")))
                 .salaryPeriod(parseSalaryPeriod(salaryText, text(salaryValue, "unitText")))
                 .industry(text(jobPostingJson, "industry"))
                 .skills(parseSkills(jobPostingJson.path("skills")))
@@ -164,13 +171,13 @@ public class JsonLdJobPostingExtractor {
             return null;
         }
         try {
-            return OffsetDateTime.parse(value).toLocalDateTime();
+            return OffsetDateTime.parse(value).atZoneSameInstant(VIETNAM_ZONE).toLocalDateTime();
         } catch (DateTimeParseException ignored) {
             try {
                 return LocalDateTime.parse(value);
             } catch (DateTimeParseException exception) {
                 try {
-                    return LocalDateTime.ofInstant(Instant.parse(value), ZoneOffset.UTC);
+                    return LocalDateTime.ofInstant(Instant.parse(value), VIETNAM_ZONE);
                 } catch (DateTimeParseException invalidDate) {
                     try {
                         return LocalDate.parse(value).atStartOfDay();
@@ -207,22 +214,61 @@ public class JsonLdJobPostingExtractor {
         if (value == null) {
             return List.of();
         }
-        Matcher matcher = SALARY_NUMBER.matcher(value);
+        Matcher matcher = SALARY_NUMBER.matcher(normalize(value));
+        List<String> numbers = new ArrayList<>(2);
+        List<Long> multipliers = new ArrayList<>(2);
+        Long rangeMultiplier = null;
+        while (matcher.find() && numbers.size() < 2) {
+            Long multiplier = salaryMultiplier(matcher.group(2));
+            numbers.add(matcher.group(1));
+            multipliers.add(multiplier);
+            if (multiplier != null) {
+                rangeMultiplier = multiplier;
+            }
+        }
+
         List<Long> result = new ArrayList<>(2);
-        while (matcher.find() && result.size() < 2) {
-            String number = matcher.group().replace(",", "").replace(".", "");
+        for (int i = 0; i < numbers.size(); i++) {
+            Long multiplier = multipliers.get(i) != null ? multipliers.get(i) : rangeMultiplier;
             try {
-                result.add(Long.parseLong(number));
+                result.add(multiplier == null
+                        ? Long.parseLong(numbers.get(i).replace(",", "").replace(".", ""))
+                        : parseScaledAmount(numbers.get(i), multiplier));
             } catch (NumberFormatException exception) {
-                log.warn("Invalid salary value: {}", matcher.group());
+                log.warn("Invalid salary value: {}", numbers.get(i));
             }
         }
         return result;
     }
 
+    private Long salaryMultiplier(String unit) {
+        if (unit == null) {
+            return null;
+        }
+        return unit.startsWith("tr") ? 1_000_000L : 1_000L;
+    }
+
+    private long parseScaledAmount(String number, long multiplier) {
+        String plain = SALARY_DECIMAL.matcher(number).matches()
+                ? number.replace(",", ".")
+                : number.replace(",", "").replace(".", "");
+        return new BigDecimal(plain).multiply(BigDecimal.valueOf(multiplier)).longValue();
+    }
+
+    private String resolveCurrency(String salaryText, String currency) {
+        if (salaryText != null && VND_SALARY.matcher(normalize(salaryText)).find()) {
+            return "VND";
+        }
+        return currency;
+    }
+
+    private String normalize(String value) {
+        return Normalizer.normalize(value, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
+    }
+
     private String parseSalaryPeriod(String salaryText, String unitText) {
         if (salaryText != null) {
-            String normalized = salaryText.toLowerCase(Locale.ROOT);
+            String normalized = normalize(salaryText);
             if (normalized.contains("/th\u00e1ng") || normalized.contains("/month")) {
                 return "MONTH";
             }
@@ -242,6 +288,9 @@ public class JsonLdJobPostingExtractor {
     private int parseExperienceMonths(JsonNode node) {
         if (node.isMissingNode() || node.isNull()) {
             return 0;
+        }
+        if (node.isObject()) {
+            return node.path("monthsOfExperience").asInt(0);
         }
         Matcher matcher = Pattern.compile("\\d+").matcher(node.asText());
         if (!matcher.find()) {

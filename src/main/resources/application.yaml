@@ -97,3 +97,10 @@ crawler:
       job-page-url-prefix: https://itviec.com/it-jobs/
       seeds:
         - https://itviec.com/it-jobs
+
+    - name: VIETNAMWORK
+      enabled: true
+      delay: 3s
+      job-page-url-prefix: https://www.vietnamworks.com/
+      seeds:
+        - https://www.vietnamworks.com/tim-viec-lam
