@@ -34,7 +34,7 @@ public class JsonLdJobPostingExtractor {
     private final ObjectMapper objectMapper;
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final Pattern SALARY_NUMBER = Pattern.compile(
-            "(\\d[\\d.,]*)(?:\\s*(triệu|tr|k|nghìn|ngàn)(?!\\p{L}))?");
+            "(\\d[\\d.,]*)(?:\\s*(triệu|tr|million|mil|m|k|nghìn|ngàn)(?!\\p{L}))?");
     private static final Pattern SALARY_DECIMAL = Pattern.compile("\\d+[.,]\\d{1,2}");
     private static final Pattern VND_SALARY = Pattern.compile(
             "₫|vnd|vnđ|đồng|\\d\\s*(?:đ|triệu|tr)(?!\\p{L})");
@@ -156,6 +156,9 @@ public class JsonLdJobPostingExtractor {
             Set<String> words = new HashSet<>(Arrays.asList(
                     value.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+")));
             words.remove("");
+            if (words.isEmpty()) {
+                continue;
+            }
 
             if (joinedWords.stream().noneMatch(words::contains)) {
                 parts.add(value);
@@ -245,7 +248,7 @@ public class JsonLdJobPostingExtractor {
         if (unit == null) {
             return null;
         }
-        return unit.startsWith("tr") ? 1_000_000L : 1_000L;
+        return unit.startsWith("tr") || unit.startsWith("m") ? 1_000_000L : 1_000L;
     }
 
     private long parseScaledAmount(String number, long multiplier) {
