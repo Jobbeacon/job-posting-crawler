@@ -6,6 +6,7 @@ import org.example.jobpostingcrawler.config.CrawlerProperties;
 import org.example.jobpostingcrawler.extractor.JobPostingExtractor;
 import org.example.jobpostingcrawler.exception.FetchException;
 import org.example.jobpostingcrawler.extractor.UrlExtractor;
+import org.example.jobpostingcrawler.extractor.html.DomainConfigProvider;
 import org.example.jobpostingcrawler.fetcher.Fetcher;
 import org.example.jobpostingcrawler.messaging.JobPostingPublisher;
 import org.example.jobpostingcrawler.model.CrawlUrl;
@@ -46,6 +47,7 @@ public class CrawlWorker implements SmartLifecycle {
     private final UrlExtractor urlExtractor;
     private final JobPostingPublisher jobPostingPublisher;
     private final DomainDelayService domainDelayService;
+    private final DomainConfigProvider domainConfigProvider;
     private final MeterRegistry meterRegistry;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -179,6 +181,13 @@ public class CrawlWorker implements SmartLifecycle {
 
             if (cacheService.isSeen(url)) {
                 log.debug("Skip cached url={}", url);
+                return true;
+            }
+
+            if (domainConfigProvider.isPaused(DomainConfigProvider.domainKey(url))) {
+                // first structure discovery of the domain is pending: drop without marking it seen, the
+                // coordinator pushes the seeds again once it is done
+                log.debug("Skip url of a domain waiting for HTML structure discovery: {}", url);
                 return true;
             }
 

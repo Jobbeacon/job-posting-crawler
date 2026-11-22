@@ -1,6 +1,7 @@
 package org.example.jobpostingcrawler.extractor;
 
 import org.example.jobpostingcrawler.config.PlaywrightProperties;
+import org.example.jobpostingcrawler.exception.FetchException;
 import org.example.jobpostingcrawler.fetcher.Fetcher;
 import org.example.jobpostingcrawler.fetcher.ProxyProvider;
 import org.jsoup.nodes.Document;
@@ -15,6 +16,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Test thủ công: điền URL job detail vào {@link #JOB_DETAIL_URL} rồi chạy class này.
@@ -25,12 +27,14 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
  *
  * Ví dụ:
  * https://www.topcv.vn/viec-lam/junior-fullstack-developer-nestjs-reactjs/2246269.html
- * https://itviec.com/it-jobs/devsecops-engineer-khoi-cong-nghe-thong-tin-mb-bank-2830
+ * https://itviec.com/it-jobs/middle-senior-fullstack-developer-java-go-mb-bank-0143
+ *
+ * Tin tuyển dụng bị gỡ thì trang trả 404/410: test được bỏ qua (skipped), thay URL khác rồi chạy lại.
  */
 class UrlExtractorRelatedJobTest {
 
     // Điền URL trang chi tiết job vào đây.
-    private static final String JOB_DETAIL_URL = "https://itviec.com/it-jobs/devsecops-engineer-khoi-cong-nghe-thong-tin-mb-bank-2830";
+    private static final String JOB_DETAIL_URL = "https://itviec.com/it-jobs/middle-senior-fullstack-developer-java-go-mb-bank-0143";
 
     private static final Pattern TOPCV_JOB_DETAIL =
             Pattern.compile("^/viec-lam/.+/\\d+\\.html$");
@@ -47,7 +51,14 @@ class UrlExtractorRelatedJobTest {
 
         UrlExtractor extractor = new UrlExtractor();
         ProxyProvider proxyProvider = new ProxyProvider(new PlaywrightProperties(false, List.of()));
-        Document document = new Fetcher(proxyProvider).getDocument(JOB_DETAIL_URL.trim());
+        Document document;
+        try {
+            document = new Fetcher(proxyProvider).getDocument(JOB_DETAIL_URL.trim());
+        } catch (FetchException e) {
+            assumeTrue(e.getStatusCode() < 400 || e.getStatusCode() >= 500,
+                    "Trang job không còn (HTTP " + e.getStatusCode() + "), thay JOB_DETAIL_URL rồi chạy lại");
+            throw e;
+        }
         List<String> extracted = extractor.extractUrls(document);
         List<String> relatedJobs = extracted.stream()
                 .filter(UrlExtractorRelatedJobTest::isJobDetailUrl)

@@ -39,3 +39,5 @@ application-local.yaml
 CLAUDE.md
 .claude/
 .work/
+.env.*
+!.env.example
