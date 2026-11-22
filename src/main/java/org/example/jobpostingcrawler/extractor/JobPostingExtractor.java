@@ -2,6 +2,7 @@ package org.example.jobpostingcrawler.extractor;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.jobpostingcrawler.extractor.health.ExtractionHealthMonitor;
 import org.example.jobpostingcrawler.extractor.html.HtmlJobPostingExtractor;
 import org.example.jobpostingcrawler.extractor.jsonld.JsonLdJobPostingExtractor;
 import org.example.jobpostingcrawler.model.JobPosting;
@@ -23,10 +24,17 @@ public class JobPostingExtractor {
 
     private final JsonLdJobPostingExtractor jsonLdExtractor;
     private final HtmlJobPostingExtractor htmlExtractor;
+    private final ExtractionHealthMonitor healthMonitor;
 
     public JobPosting extract(Document doc, String url) {
         JobPosting jsonLd = jsonLdExtractor.extract(doc, url);
-        JobPosting html = htmlExtractor.extract(doc, url);
+        HtmlJobPostingExtractor.HtmlExtraction htmlExtraction = htmlExtractor.extractDetailed(doc, url);
+        JobPosting html = htmlExtraction == null ? null : htmlExtraction.posting();
+        try {
+            healthMonitor.record(htmlExtraction, jsonLd);
+        } catch (Exception e) {
+            log.warn("(extract) XPath health check failed for {}: {}", url, e.getMessage());
+        }
 
         JobPosting merged = merge(jsonLd, html, url);
         log.debug("(extract) Sources for {}: jsonLd={}, html={}, skills={}",

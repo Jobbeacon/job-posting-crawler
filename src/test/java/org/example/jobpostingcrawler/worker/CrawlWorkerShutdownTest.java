@@ -7,6 +7,7 @@ import ch.qos.logback.core.read.ListAppender;
 import org.example.jobpostingcrawler.config.CrawlerProperties;
 import org.example.jobpostingcrawler.extractor.JobPostingExtractor;
 import org.example.jobpostingcrawler.extractor.UrlExtractor;
+import org.example.jobpostingcrawler.extractor.html.DomainConfigProvider;
 import org.example.jobpostingcrawler.fetcher.Fetcher;
 import org.example.jobpostingcrawler.messaging.JobPostingPublisher;
 import org.example.jobpostingcrawler.scheduler.service.CrawlCacheService;
@@ -52,6 +53,8 @@ class CrawlWorkerShutdownTest {
     private JobPostingPublisher jobPostingPublisher;
     @Mock
     private DomainDelayService domainDelayService;
+    @Mock
+    private DomainConfigProvider domainConfigProvider;
 
     private CrawlWorker worker;
     private ListAppender<ILoggingEvent> logAppender;
@@ -75,6 +78,7 @@ class CrawlWorkerShutdownTest {
                 urlExtractor,
                 jobPostingPublisher,
                 domainDelayService,
+                domainConfigProvider,
                 new SimpleMeterRegistry()
         );
         worker.registerMetrics();

@@ -1,5 +1,9 @@
 server:
   port: ${PORT:8081}
+  # Every endpoint lives under the service name, so paths never collide across services and the gateway
+  # routes by prefix without rewriting.
+  servlet:
+    context-path: /job-posting-crawler
 
 management:
   endpoints:
@@ -49,28 +53,47 @@ spring:
           time_zone: UTC
 
 playwright:
-  headless: ${PLAYWRIGHT_HEADLESS:false}
+  headless: ${PLAYWRIGHT_HEADLESS:true}
   proxies: ${PLAYWRIGHT_PROXIES:}
 
 crawler:
+  # XPaths of the HTML extractor live in the DB table domain_extractor_config (one row per domain).
   extractor:
-    html:
-      domains:
-        itviec_com:
-          title: "//div[@class='job-header-info']/h1"
-          company-name: "//div[@class='employer-name']"
-          company-logo-url: "//img[contains(@class, 'employer-logo')]/@src"
-          description: "//section[contains(@class, 'job-content')]"
-          location: "//*[local-name()='svg'][*[local-name()='use' and contains(@href,'#map-pin')]]/following-sibling::span[contains(@class,'text-rich-grey')][1]"
-          industry: "//div[normalize-space(.)='Job Domain:']/following-sibling::div[1]"
-          skills: "//div[normalize-space(.)='Skills:']/following-sibling::div[1]"
+    config-refresh-interval: 5m
+    # Detection of XPaths broken by a layout change (domain -> STALE, then discovered again)
+    health:
+      enabled: true
+      window: 100              # last pages kept per domain
+      min-pages: 30            # pages needed before declaring a field broken
+      healthy-baseline: 0.8    # only fields found on >= 80% of the discovery samples are watched
+      broken-below: 0.2        # broken when < 20% of the pages give a valid value (or match JSON-LD)
+      evaluate-every: 10
+      rediscovery-delay: 24h   # at most one discovery a day per domain
+  # LLM-based HTML structure discovery: fills domain_extractor_config for sources without an ACTIVE row.
+  # Needs GEMINI_API_KEY; otherwise such domains are crawled with JSON-LD only.
+  structure-discovery:
+    enabled: ${STRUCTURE_DISCOVERY_ENABLED:false}
+    sample-count: 4        # job pages loaded per domain
+    llm-sample-count: 2    # of those, pages analysed by the LLM (the rest only validate the XPaths)
+    max-prompt-chars: 40000
+    page-settle-time: 6s
+    headless: true
+    recheck-interval: 1h   # look for new domains / failed ones due for a retry
+    running-timeout: 30m   # a RUNNING row older than this is a dead run (app stopped) and is re-run
+    retry-base-delay: 1h   # wait after a failure, doubled each time (1h, 2h, 4h...)
+    retry-max-delay: 24h
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-3.1-flash-lite}
+      timeout: 120s
+
   scheduler:
     enabled: true
     seed-interval: 1d
 
   worker:
     enabled: true
-    pool-size: ${CRAWLER_WORKER_POOL_SIZE:1}
+    pool-size: ${CRAWLER_WORKER_POOL_SIZE:5}
     idle-interval: 5s
     max-depth: ${CRAWLER_MAX_DEPTH:5}
 
@@ -93,14 +116,24 @@ crawler:
 
     - name: ITVIEC
       enabled: true
-      delay: 3s
+      delay: 0s
       job-page-url-prefix: https://itviec.com/it-jobs/
       seeds:
         - https://itviec.com/it-jobs
 
     - name: VIETNAMWORK
       enabled: true
-      delay: 3s
+      delay: 0s
       job-page-url-prefix: https://www.vietnamworks.com/
       seeds:
         - https://www.vietnamworks.com/tim-viec-lam
+
+eureka:
+  client:
+    # Turn off (EUREKA_ENABLED=false) to run the service without the discovery server.
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    # Register the container/host IP rather than the hostname, so other services can reach it inside Docker.
+    prefer-ip-address: true
