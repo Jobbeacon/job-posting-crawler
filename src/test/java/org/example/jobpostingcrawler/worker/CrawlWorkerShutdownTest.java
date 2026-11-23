@@ -18,6 +18,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -29,8 +30,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.atMost;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +64,27 @@ class CrawlWorkerShutdownTest {
 
     private CrawlWorker worker;
     private ListAppender<ILoggingEvent> logAppender;
+
+    @Test
+    void restoresSeenJobsBeforeCrawling() {
+        InOrder order = inOrder(cacheService, queueService);
+        when(queueService.pop()).thenReturn(Optional.empty());
+
+        worker.start();
+
+        order.verify(cacheService).restoreSeenJobs();
+        order.verify(queueService, timeout(2000).atLeastOnce()).pop();
+    }
+
+    @Test
+    void doesNotCrawlWhenSeenJobsCannotBeRestored() {
+        doThrow(new IllegalStateException("redis down")).when(cacheService).restoreSeenJobs();
+
+        assertThrows(IllegalStateException.class, worker::start);
+
+        assertFalse(worker.isRunning());
+        verify(queueService, never()).pop();
+    }
 
     @BeforeEach
     void setUp() {

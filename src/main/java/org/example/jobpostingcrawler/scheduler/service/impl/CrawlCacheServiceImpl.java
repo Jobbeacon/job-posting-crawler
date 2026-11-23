@@ -17,9 +17,12 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
@@ -28,6 +31,7 @@ public class CrawlCacheServiceImpl implements CrawlCacheService {
 
     private static final String SEEN_KEY_PREFIX = "crawler:url:seen:";
     private static final Duration BLOOM_COMMAND_TIMEOUT = Duration.ofSeconds(5);
+    private static final int RESTORE_BATCH_SIZE = 500;
 
     private final StringRedisTemplate redisTemplate;
     private final CrawlerProperties properties;
@@ -54,6 +58,16 @@ public class CrawlCacheServiceImpl implements CrawlCacheService {
         log.debug("(markSeenJob) url={}", url);
     }
 
+    @Override
+    public void restoreSeenJobs() {
+        AtomicInteger restored = new AtomicInteger();
+        crawledUrlService.forEachBatch(RESTORE_BATCH_SIZE, urls -> {
+            executeBloomCommand(BloomCommand.BF_ADD, urls);
+            restored.addAndGet(urls.size());
+        });
+        log.info("Bloom filter holds all {} crawled job urls", restored.get());
+    }
+
     private boolean isSeenJob(String url) {
         boolean possiblySeen = Boolean.TRUE.equals(executeBloomCommand(BloomCommand.BF_EXISTS, url));
         if (!possiblySeen) {
@@ -64,7 +78,12 @@ public class CrawlCacheServiceImpl implements CrawlCacheService {
     }
 
     private Boolean executeBloomCommand(BloomCommand command, String url) {
-        return redisTemplate.execute((RedisCallback<Boolean>) connection -> {
+        return executeBloomCommand(command, List.of(url)).get(0);
+    }
+
+    /** Sends one command per url without waiting in between, then collects the answers in the same order. */
+    private List<Boolean> executeBloomCommand(BloomCommand command, List<String> urls) {
+        return redisTemplate.execute((RedisCallback<List<Boolean>>) connection -> {
             Object nativeConnection = connection.getNativeConnection();
             if (!(nativeConnection instanceof BaseRedisAsyncCommands<?, ?> asyncCommands)) {
                 throw new IllegalStateException("Bloom filter commands require a Lettuce Redis connection");
@@ -73,19 +92,27 @@ public class CrawlCacheServiceImpl implements CrawlCacheService {
             @SuppressWarnings("unchecked")
             BaseRedisAsyncCommands<byte[], byte[]> commands = (BaseRedisAsyncCommands<byte[], byte[]>) asyncCommands;
 
-            CommandArgs<byte[], byte[]> args = new CommandArgs<>(ByteArrayCodec.INSTANCE)
-                    .addKey(bloomFilterKey())
-                    .addValue(bytes(url));
-
-            RedisFuture<Boolean> future = commands.dispatch(command, new BooleanOutput<>(ByteArrayCodec.INSTANCE), args);
-            try {
-                return future.get(BLOOM_COMMAND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("Interrupted while waiting for " + command + " on url=" + url, e);
-            } catch (ExecutionException | TimeoutException e) {
-                throw new IllegalStateException(command + " failed for url=" + url, e);
+            List<RedisFuture<Boolean>> futures = new ArrayList<>(urls.size());
+            for (String url : urls) {
+                CommandArgs<byte[], byte[]> args = new CommandArgs<>(ByteArrayCodec.INSTANCE)
+                        .addKey(bloomFilterKey())
+                        .addValue(bytes(url));
+                futures.add(commands.dispatch(command, new BooleanOutput<>(ByteArrayCodec.INSTANCE), args));
             }
+
+            List<Boolean> results = new ArrayList<>(urls.size());
+            for (int i = 0; i < urls.size(); i++) {
+                String url = urls.get(i);
+                try {
+                    results.add(futures.get(i).get(BLOOM_COMMAND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Interrupted while waiting for " + command + " on url=" + url, e);
+                } catch (ExecutionException | TimeoutException e) {
+                    throw new IllegalStateException(command + " failed for url=" + url, e);
+                }
+            }
+            return results;
         });
     }
 

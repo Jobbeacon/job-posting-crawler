@@ -83,6 +83,13 @@ public class CrawlWorker implements SmartLifecycle {
         if (!running.compareAndSet(false, true)) {
             return;
         }
+        try {
+            // Before any worker runs: crawling against an incomplete filter would publish known jobs again.
+            cacheService.restoreSeenJobs();
+        } catch (RuntimeException e) {
+            running.set(false);
+            throw e;
+        }
         allowedDomains = Set.copyOf(loadAllowedDomains());
         int poolSize = properties.worker().poolSize();
         executor = Executors.newFixedThreadPool(poolSize);

@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.entity.CrawledUrl;
 import org.example.jobpostingcrawler.repository.CrawledUrlRepository;
 import org.example.jobpostingcrawler.storage.CrawledUrlService;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +16,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -49,6 +52,20 @@ public class CrawledUrlServiceImpl implements CrawledUrlService {
     @Override
     public boolean exists(String url) {
         return crawledUrlRepository.findByUrlHash(hash(url)).isPresent();
+    }
+
+    @Override
+    public void forEachBatch(int batchSize, Consumer<List<String>> consumer) {
+        // Postgres orders uuid bytewise, so the nil UUID sorts before every real id.
+        UUID last = new UUID(0, 0);
+        while (true) {
+            List<CrawledUrl> batch = crawledUrlRepository.findByIdGreaterThanOrderById(last, Limit.of(batchSize));
+            if (batch.isEmpty()) {
+                return;
+            }
+            consumer.accept(batch.stream().map(CrawledUrl::getUrl).toList());
+            last = batch.get(batch.size() - 1).getId();
+        }
     }
 
     private String hash(String url) {
