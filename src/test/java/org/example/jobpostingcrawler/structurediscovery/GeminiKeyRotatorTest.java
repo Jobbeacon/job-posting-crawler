@@ -147,6 +147,73 @@ class GeminiKeyRotatorTest {
     }
 
     @Test
+    void everyKeyIsTriedBeforeTheNextModel() {
+        List<String> targets = new ArrayList<>();
+        String result = rotator(2).execute("op", List.of("best", "second"), (key, model) -> {
+            targets.add(model + key);
+            if (model.equals("best")) {
+                throw QUOTA;
+            }
+            return "ok";
+        });
+        assertEquals("ok", result);
+        assertEquals(List.of("best0", "best1", "second0"), targets);
+        assertEquals(List.of(), sleeps, "no wait while another model has quota");
+    }
+
+    @Test
+    void nextCallStartsAtTheBestModelAgain() {
+        GeminiKeyRotator rotator = rotator(1);
+        rotator.execute("op", List.of("best", "second"), (key, model) -> {
+            if (model.equals("best")) {
+                throw QUOTA;
+            }
+            return "ok";
+        });
+        assertEquals("best", rotator.execute("op", List.of("best", "second"), (key, model) -> model));
+    }
+
+    @Test
+    void modelClosedToOneKeyIsTriedWithTheOthers() {
+        List<String> targets = new ArrayList<>();
+        rotator(2).execute("op", List.of("best", "second"), (key, model) -> {
+            targets.add(model + key);
+            if (key == 0) {
+                throw new ApiException(404, "NOT_FOUND", "no longer available to new users");
+            }
+            return "ok";
+        });
+        assertEquals(List.of("best0", "best1"), targets);
+    }
+
+    @Test
+    void requestRejectedByAModelGoesToTheNextModelAtOnce() {
+        List<String> targets = new ArrayList<>();
+        rotator(2).execute("op", List.of("best", "second"), (key, model) -> {
+            targets.add(model + key);
+            if (model.equals("best")) {
+                throw BAD_REQUEST;
+            }
+            return "ok";
+        });
+        assertEquals(List.of("best0", "second0"), targets);
+    }
+
+    @Test
+    void hangingModelIsLeftForTheNextModelAtOnce() {
+        List<String> targets = new ArrayList<>();
+        rotator(2).execute("op", List.of("best", "second"), (key, model) -> {
+            targets.add(model + key);
+            if (model.equals("best")) {
+                throw new GenAiIOException("timeout");
+            }
+            return "ok";
+        });
+        assertEquals(List.of("best0", "second0"), targets);
+        assertEquals(List.of(), sleeps);
+    }
+
+    @Test
     void mixedFailuresDoNotWaitForTheQuota() {
         // one key over quota, the other overloaded: not a per-minute quota on every key, no 15s wait
         assertThrows(RuntimeException.class, () -> rotator(2).execute("op", key -> {

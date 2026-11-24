@@ -39,7 +39,7 @@ Health: `http://localhost:8081/job-posting-crawler/actuator/health` (context pat
 | `EUREKA_ENABLED`, `EUREKA_URL` | `true`, `http://localhost:8761/eureka/` | Đăng ký discovery |
 | `STRUCTURE_DISCOVERY_ENABLED` | `false` | Bật tự tìm XPath cho domain chưa có cấu hình |
 | `GEMINI_API_KEY` | trống | Một hoặc nhiều key, cách nhau bằng dấu phẩy |
-| `GEMINI_MODEL` | `gemini-3.1-flash-lite` | Model dùng cho structure discovery |
+| `GEMINI_MODEL` | `gemini-3.1-flash-lite,gemini-3.5-flash-lite` | Model dùng cho structure discovery, tốt nhất đứng trước. Xoay hết key rồi mới sang model sau |
 
 Danh sách source (`crawler.sources`: seed, `job-page-url-prefix`, delay) nằm trong `application.yaml` và `application-local.yaml`.
 
