@@ -48,13 +48,13 @@ public record StructureDiscoveryProperties(
 
     /**
      * @param apiKey         one or more keys, comma-separated
-     * @param model          Gemini model id
+     * @param model          one or more Gemini model ids, comma-separated, best first
      * @param timeout        per request
      * @param thinkingBudget null = model default, 0 = off
      */
     public record Gemini(String apiKey, String model, Duration timeout, Integer thinkingBudget) {
         public Gemini {
-            model = model == null || model.isBlank() ? "gemini-3.1-flash-lite" : model;
+            model = model == null || model.isBlank() ? "gemini-3.1-flash-lite,gemini-3.5-flash-lite" : model;
             timeout = timeout == null ? Duration.ofSeconds(120) : timeout;
         }
     }

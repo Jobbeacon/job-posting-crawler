@@ -5,21 +5,24 @@ import com.google.genai.errors.GenAiIOException;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 
 /**
- * Calls Gemini over several API keys, same rules as Jobbeacon-be (GeminiClientPool + GeminiRetryExecutor with
- * rotateKeyOnRateLimit):
+ * Calls Gemini over several API keys and models. Models are ordered best first and every call starts at the best one:
  * <ul>
  *   <li>429 (quota): switch to the next key at once; the key in use is shared by all calls, so later calls
  *   start on a key that still has quota;</li>
  *   <li>bad, expired or disabled key (401/403, or 400 "API key not valid"): switch to the next key;</li>
  *   <li>5xx, 408, network errors, unparsable answer: retry on the same key with exponential backoff, then
  *   switch to the next key;</li>
- *   <li>other errors (400...): thrown at once.</li>
+ *   <li>404 (the key cannot use the model): switch to the next key;</li>
+ *   <li>the model fails with every key, rejects the request (400) or hangs (timeout, network error): switch to the
+ *   next model;</li>
+ *   <li>other errors, or a request rejected by the last model: thrown at once.</li>
  * </ul>
- * When every key answered 429 (free tier quotas are per minute), waits 15s then 30s and tries all keys again.
+ * When every key answered 429 for every model (free tier quotas are per minute), waits 15s then 30s and tries again.
  */
 @Slf4j
 public class GeminiKeyRotator {
@@ -29,9 +32,16 @@ public class GeminiKeyRotator {
         void sleep(long millis) throws InterruptedException;
     }
 
+    /** Performs the request with the key of the given index and the given model. */
+    @FunctionalInterface
+    public interface ModelCall<T> {
+        T apply(int key, String model);
+    }
+
     private static final int BAD_REQUEST = 400;
     private static final int UNAUTHORIZED = 401;
     private static final int FORBIDDEN = 403;
+    private static final int NOT_FOUND = 404;
     private static final int REQUEST_TIMEOUT = 408;
     private static final int TOO_MANY_REQUESTS = 429;
     private static final int SERVER_ERROR = 500;
@@ -76,29 +86,47 @@ public class GeminiKeyRotator {
      * @param call performs the request with the key of the given index
      */
     public <T> T execute(String operation, IntFunction<T> call) {
+        return execute(operation, List.of("default"), (key, model) -> call.apply(key));
+    }
+
+    /**
+     * @param models at least one, best first
+     */
+    public <T> T execute(String operation, List<String> models, ModelCall<T> call) {
         RuntimeException last = null;
         for (int round = 1; round <= rateLimitRounds; round++) {
             boolean allRateLimited = true;
-            int start = current.get();
-            for (int tried = 0; tried < keyCount; tried++) {
-                int key = (start + tried) % keyCount;
-                try {
-                    return executeWithRetry(operation, key, call);
-                } catch (RuntimeException e) {
-                    if (!switchesKey(e)) {
-                        throw e;
+            for (int m = 0; m < models.size(); m++) {
+                String model = models.get(m);
+                boolean lastModel = m == models.size() - 1;
+                int start = current.get();
+                for (int tried = 0; tried < keyCount; tried++) {
+                    int key = (start + tried) % keyCount;
+                    try {
+                        return executeWithRetry(operation + " " + model, key, lastModel, k -> call.apply(k, model));
+                    } catch (RuntimeException e) {
+                        last = e;
+                        allRateLimited &= isRateLimited(e);
+                        if (!lastModel && (isRejected(e) || isHang(e))) {
+                            break;
+                        }
+                        if (!switchesKey(e)) {
+                            throw e;
+                        }
+                        rotateFrom(key);
                     }
-                    last = e;
-                    allRateLimited &= isRateLimited(e);
-                    rotateFrom(key);
+                }
+                if (!lastModel) {
+                    log.warn("[StructureDiscovery] {}: model {} failed, switching to {}", operation, model,
+                            models.get(m + 1));
                 }
             }
             if (!allRateLimited || round == rateLimitRounds) {
                 break;
             }
             long waitMs = rateLimitWait.toMillis() * round;
-            log.warn("[StructureDiscovery] {}: all {} Gemini key(s) rate limited, waiting {}s", operation, keyCount,
-                    waitMs / 1000);
+            log.warn("[StructureDiscovery] {}: all {} Gemini key(s) rate limited on {} model(s), waiting {}s", operation,
+                    keyCount, models.size(), waitMs / 1000);
             sleep(waitMs, last);
         }
         if (keyCount > 1) {
@@ -107,15 +135,19 @@ public class GeminiKeyRotator {
         throw last;
     }
 
-    private <T> T executeWithRetry(String operation, int key, IntFunction<T> call) {
+    private <T> T executeWithRetry(String operation, int key, boolean lastModel, IntFunction<T> call) {
         long delayMs = initialDelay.toMillis();
         for (int attempt = 1; ; attempt++) {
             try {
                 return call.apply(key);
             } catch (RuntimeException e) {
                 String error = describe(e);
-                if (isRateLimited(e) || isAuthError(e)) {
+                if (isRateLimited(e) || isAuthError(e) || isNotFound(e)) {
                     log.warn("[StructureDiscovery] {} key#{}: {}, switching key", operation, key + 1, error);
+                    throw e;
+                }
+                if (!lastModel && isHang(e)) {
+                    log.warn("[StructureDiscovery] {} key#{}: {}", operation, key + 1, error);
                     throw e;
                 }
                 if (!isTransient(e)) {
@@ -146,11 +178,25 @@ public class GeminiKeyRotator {
     }
 
     private boolean switchesKey(RuntimeException e) {
-        return isRateLimited(e) || isAuthError(e) || isTransient(e);
+        return isRateLimited(e) || isAuthError(e) || isNotFound(e) || isTransient(e);
     }
 
     static boolean isRateLimited(RuntimeException e) {
         return e instanceof ApiException api && api.code() == TOO_MANY_REQUESTS;
+    }
+
+    /** Models closed to new accounts answer 404, so another key may still have them. */
+    static boolean isNotFound(RuntimeException e) {
+        return e instanceof ApiException api && api.code() == NOT_FOUND;
+    }
+
+    private static boolean isHang(RuntimeException e) {
+        return e instanceof GenAiIOException;
+    }
+
+    /** The model cannot take this request (a setting it does not know, for example). */
+    static boolean isRejected(RuntimeException e) {
+        return e instanceof ApiException api && api.code() == BAD_REQUEST && !isAuthError(e);
     }
 
     /**
