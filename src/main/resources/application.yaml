@@ -137,30 +137,28 @@ crawler:
 
     - name: TOPDEV
       enabled: true
-      delay: 3s
+      delay: 1s
       job-page-url-prefix: https://topdev.vn/detail-jobs/
       seeds:
         - https://topdev.vn/viec-lam-it
 
     - name: CAREERLINK
       enabled: true
-      delay: 3s
-      # trailing slash: /tim-viec-lam-tai/... and /tim-viec-lam-nhanh are listing pages
+      delay: 1s
       job-page-url-prefix: https://www.careerlink.vn/tim-viec-lam/
       seeds:
         - https://www.careerlink.vn/vieclam/list
 
     - name: VIECLAM24H
       enabled: true
-      delay: 3s
-      # job urls have no common prefix (/{industry}/{slug}-c..p..id{n}.html): pages without JSON-LD are not jobs
+      delay: 1s
       job-page-url-prefix: https://vieclam24h.vn/
       seeds:
         - https://vieclam24h.vn/tim-kiem-viec-lam-nhanh
 
     - name: GLINTS
       enabled: true
-      delay: 3s
+      delay: 1s
       job-page-url-prefix: https://glints.com/vn/opportunities/jobs/
       seeds:
         - https://glints.com/vn/opportunities/jobs/explore
