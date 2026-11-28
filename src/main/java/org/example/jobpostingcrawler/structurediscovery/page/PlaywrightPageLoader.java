@@ -6,8 +6,10 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Response;
+import com.microsoft.playwright.options.Proxy;
 import com.microsoft.playwright.options.WaitUntilState;
 import lombok.extern.slf4j.Slf4j;
+import org.example.jobpostingcrawler.fetcher.ProxyConfig;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
@@ -15,8 +17,9 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Own Playwright instance (independent from the crawler's Fetcher) with the same browser settings, so pages
- * rendered client-side (e.g. VietnamWorks) are seen exactly as the crawler will see them.
+ * Own Playwright instance (independent from the crawler's Fetcher) with the same browser settings and proxy, so
+ * pages rendered client-side (e.g. VietnamWorks) are seen exactly as the crawler will see them, and sites that block
+ * the server's own IP (HTTP 403) serve the discovery like they serve the crawler.
  * Not thread-safe: use one instance per thread and close it.
  */
 @Slf4j
@@ -30,11 +33,31 @@ public class PlaywrightPageLoader implements PageLoader {
     private final Duration settleTime;
 
     public PlaywrightPageLoader(boolean headless, Duration settleTime) {
+        this(headless, settleTime, null);
+    }
+
+    /** @param proxy proxy of the browser, null to connect directly */
+    public PlaywrightPageLoader(boolean headless, Duration settleTime, ProxyConfig proxy) {
         this.settleTime = settleTime;
         this.playwright = Playwright.create();
-        this.browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
+        BrowserType.LaunchOptions options = new BrowserType.LaunchOptions()
                 .setHeadless(headless)
-                .setArgs(List.of("--disable-blink-features=AutomationControlled")));
+                .setChannel("chromium")
+                .setArgs(List.of("--disable-blink-features=AutomationControlled"));
+        if (proxy != null) {
+            Proxy playwrightProxy = new Proxy(proxy.server());
+            if (proxy.hasCredentials()) {
+                playwrightProxy.setUsername(proxy.username()).setPassword(proxy.password());
+            }
+            options.setProxy(playwrightProxy);
+            log.info("[StructureDiscovery] browser using proxy {}:{}", proxy.host(), proxy.port());
+        }
+        try {
+            this.browser = playwright.chromium().launch(options);
+        } catch (RuntimeException e) {
+            playwright.close();
+            throw e;
+        }
     }
 
     @Override

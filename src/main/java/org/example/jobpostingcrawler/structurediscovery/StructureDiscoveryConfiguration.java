@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.CrawlerProperties;
 import org.example.jobpostingcrawler.extractor.html.DomainConfigProvider;
+import org.example.jobpostingcrawler.fetcher.ProxyConfig;
+import org.example.jobpostingcrawler.fetcher.ProxyProvider;
 import org.example.jobpostingcrawler.repository.DomainExtractorConfigRepository;
 import org.example.jobpostingcrawler.scheduler.service.CrawlQueueService;
 import org.example.jobpostingcrawler.structurediscovery.llm.GeminiStructureLlmClient;
@@ -55,10 +57,16 @@ public class StructureDiscoveryConfiguration {
                 HtmlStructureDiscoveryService discoveryService,
                 CrawlQueueService queueService,
                 ObjectMapper objectMapper,
-                DomainDelayService domainDelayService) {
+                DomainDelayService domainDelayService,
+                ProxyProvider proxyProvider) {
             return new StructureDiscoveryCoordinator(crawlerProperties, properties, repository, configProvider,
                     discoveryService, queueService,
-                    () -> new PlaywrightPageLoader(properties.headless(), properties.pageSettleTime()),
+                    // same proxies as the crawler (the server's own IP may get HTTP 403); a new one on each run
+                    () -> {
+                        ProxyConfig proxy = proxyProvider.getProxyForCurrentThread();
+                        proxyProvider.clearForCurrentThread();
+                        return new PlaywrightPageLoader(properties.headless(), properties.pageSettleTime(), proxy);
+                    },
                     objectMapper, Clock.systemUTC(),
                     Executors.newSingleThreadExecutor(r -> {
                         Thread t = new Thread(r, "structure-discovery");

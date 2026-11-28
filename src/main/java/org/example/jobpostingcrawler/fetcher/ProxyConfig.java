@@ -13,11 +13,11 @@ public record ProxyConfig(String host, String port, String username, String pass
         return new ProxyConfig(parts[0], parts[1], username, password);
     }
 
-    String server() {
+    public String server() {
         return "http://" + host + ":" + port;
     }
 
-    boolean hasCredentials() {
+    public boolean hasCredentials() {
         return username != null && password != null;
     }
 }
