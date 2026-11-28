@@ -78,7 +78,7 @@ crawler:
   # LLM-based HTML structure discovery: fills domain_extractor_config for sources without an ACTIVE row.
   # Needs GEMINI_API_KEY; otherwise such domains are crawled with JSON-LD only.
   structure-discovery:
-    enabled: ${STRUCTURE_DISCOVERY_ENABLED:false}
+    enabled: ${STRUCTURE_DISCOVERY_ENABLED:true}
     sample-count: 4        # job pages loaded per domain
     llm-sample-count: 2    # of those, pages analysed by the LLM (the rest only validate the XPaths)
     max-prompt-chars: 40000
@@ -134,6 +134,36 @@ crawler:
       job-page-url-prefix: https://www.vietnamworks.com/
       seeds:
         - https://www.vietnamworks.com/tim-viec-lam
+
+    - name: TOPDEV
+      enabled: true
+      delay: 3s
+      job-page-url-prefix: https://topdev.vn/detail-jobs/
+      seeds:
+        - https://topdev.vn/viec-lam-it
+
+    - name: CAREERLINK
+      enabled: true
+      delay: 3s
+      # trailing slash: /tim-viec-lam-tai/... and /tim-viec-lam-nhanh are listing pages
+      job-page-url-prefix: https://www.careerlink.vn/tim-viec-lam/
+      seeds:
+        - https://www.careerlink.vn/vieclam/list
+
+    - name: VIECLAM24H
+      enabled: true
+      delay: 3s
+      # job urls have no common prefix (/{industry}/{slug}-c..p..id{n}.html): pages without JSON-LD are not jobs
+      job-page-url-prefix: https://vieclam24h.vn/
+      seeds:
+        - https://vieclam24h.vn/tim-kiem-viec-lam-nhanh
+
+    - name: GLINTS
+      enabled: true
+      delay: 3s
+      job-page-url-prefix: https://glints.com/vn/opportunities/jobs/
+      seeds:
+        - https://glints.com/vn/opportunities/jobs/explore
 
 eureka:
   client:
