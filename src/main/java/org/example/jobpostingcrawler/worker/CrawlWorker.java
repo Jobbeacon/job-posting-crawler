@@ -60,21 +60,14 @@ public class CrawlWorker implements SmartLifecycle {
     private final Map<String, Integer> fetchAttempts = new ConcurrentHashMap<>();
     private static final int MAX_FETCH_ATTEMPTS = 3;
 
-    private Counter urlsCrawledCounter;
-    private Counter jobsExtractedCounter;
-    private Counter errorsCounter;
+    private static final String URLS_CRAWLED = "crawler.urls.crawled";
+    private static final String JOBS_EXTRACTED = "crawler.jobs.extracted";
+    private static final String ERRORS = "crawler.errors";
+    // errors that happen outside of a known URL (failed cycle)
+    private static final String UNKNOWN_DOMAIN = "unknown";
 
     @PostConstruct
     void registerMetrics() {
-        urlsCrawledCounter = Counter.builder("crawler.urls.crawled")
-                .description("Total number of URLs fetched by the crawler")
-                .register(meterRegistry);
-        jobsExtractedCounter = Counter.builder("crawler.jobs.extracted")
-                .description("Total number of job postings successfully extracted")
-                .register(meterRegistry);
-        errorsCounter = Counter.builder("crawler.errors")
-                .description("Total number of crawl errors")
-                .register(meterRegistry);
         Gauge.builder("crawler.workers.active", activeWorkers, AtomicInteger::get)
                 .description("Number of workers currently processing a URL")
                 .register(meterRegistry);
@@ -96,6 +89,11 @@ public class CrawlWorker implements SmartLifecycle {
             throw e;
         }
         allowedDomains = Set.copyOf(loadAllowedDomains());
+        // every source shows up in Grafana from the start, at 0 until its first page
+        allowedDomains.forEach(domain -> {
+            counterOfDomain(URLS_CRAWLED, domain);
+            counterOfDomain(JOBS_EXTRACTED, domain);
+        });
         int poolSize = properties.worker().poolSize();
         executor = Executors.newFixedThreadPool(poolSize);
         log.info("Starting crawl worker pool with {} threads", poolSize);
@@ -154,7 +152,7 @@ public class CrawlWorker implements SmartLifecycle {
                         break;
                     }
                     log.error("Crawl worker {} failed a cycle", workerId, e);
-                    errorsCounter.increment();
+                    countError(null, "cycle");
                     try {
                         sleepIfRunning(idle);
                     } catch (InterruptedException interruptedException) {
@@ -211,7 +209,7 @@ public class CrawlWorker implements SmartLifecycle {
             } catch (FetchException e) {
                 fetchAttempts.remove(url);
                 log.warn("Fetch failed url={} status={}", e.getUrl(), e.getStatusCode());
-                errorsCounter.increment();
+                countError(url, "http");
                 return true;
             } catch (PlaywrightException e) {
                 handleBrowserFailure(crawlUrl, e);
@@ -219,7 +217,7 @@ public class CrawlWorker implements SmartLifecycle {
             }
             fetchAttempts.remove(url);
 
-            urlsCrawledCounter.increment();
+            counter(URLS_CRAWLED, url).increment();
 
             if (isJobPageUrl(url)) {
                 log.info("Extract job by url: {}", url);
@@ -228,7 +226,7 @@ public class CrawlWorker implements SmartLifecycle {
                     crawledUrlService.save(url, jobPosting.getExpiredDate());
                     cacheService.markSeenJob(url);
                     jobPostingPublisher.push(jobPosting);
-                    jobsExtractedCounter.increment();
+                    counter(JOBS_EXTRACTED, url).increment();
                 } else {
                     log.info("Failed to extract job posting, treating as non-job url: {}", url);
                     cacheAsNonJob(url);
@@ -264,8 +262,8 @@ public class CrawlWorker implements SmartLifecycle {
      * with another proxy when the proxy was the cause, and the URL goes back to the frontier instead of being lost.
      */
     private void handleBrowserFailure(CrawlUrl crawlUrl, PlaywrightException e) {
-        errorsCounter.increment();
         String url = crawlUrl.url();
+        countError(url, "browser");
         boolean proxyFailure = Fetcher.isProxyFailure(e);
         fetcher.recoverFromFailure(e);
 
@@ -279,6 +277,33 @@ public class CrawlWorker implements SmartLifecycle {
         queueService.push(crawlUrl);
         log.warn("Fetch attempt {}/{} failed, url requeued={} (proxy={}): {}",
                 attempts, MAX_FETCH_ATTEMPTS, url, proxyFailure, reason);
+    }
+
+    private Counter counter(String name, String url) {
+        return counterOfDomain(name, domainTag(url));
+    }
+
+    private Counter counterOfDomain(String name, String domain) {
+        return Counter.builder(name)
+                .description(URLS_CRAWLED.equals(name)
+                        ? "Number of URLs fetched by the crawler, per domain"
+                        : "Number of job postings extracted, per domain")
+                .tag("domain", domain)
+                .register(meterRegistry);
+    }
+
+    private void countError(String url, String type) {
+        Counter.builder(ERRORS)
+                .description("Number of crawl errors, per domain and type (http, browser, cycle)")
+                .tag("domain", domainTag(url))
+                .tag("type", type)
+                .register(meterRegistry)
+                .increment();
+    }
+
+    private static String domainTag(String url) {
+        String domain = url == null ? null : UrlUtils.extractDomain(url);
+        return domain == null ? UNKNOWN_DOMAIN : domain;
     }
 
     private static String firstLine(String message) {
