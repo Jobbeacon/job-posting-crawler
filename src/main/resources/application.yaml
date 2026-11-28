@@ -55,6 +55,12 @@ spring:
 playwright:
   headless: ${PLAYWRIGHT_HEADLESS:true}
   proxies: ${PLAYWRIGHT_PROXIES:}
+  # Wait after DOMCONTENTLOADED for the page's scripts. Shorter means more pages per minute, so more CPU, not less.
+  settle-time: ${PLAYWRIGHT_SETTLE_TIME:10s}
+  # Abort image/media/font requests: most of the rendering CPU, and the crawler only reads the HTML.
+  block-resources: ${PLAYWRIGHT_BLOCK_RESOURCES:true}
+  # A proxy failing with ERR_PROXY_*/ERR_TUNNEL_* is skipped this long when a worker picks its next proxy.
+  proxy-cooldown: ${PLAYWRIGHT_PROXY_COOLDOWN:5m}
 
 crawler:
   # XPaths of the HTML extractor live in the DB table domain_extractor_config (one row per domain).

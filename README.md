@@ -36,6 +36,9 @@ Health: `http://localhost:8081/job-posting-crawler/actuator/health` (context pat
 | `PROFILE_ACTIVE` | `local` | `application-local.yaml` ghi đè danh sách source |
 | `CRAWLER_WORKER_POOL_SIZE`, `CRAWLER_MAX_DEPTH` | `1`, `5` | Số luồng crawl, độ sâu link tối đa |
 | `PLAYWRIGHT_HEADLESS`, `PLAYWRIGHT_PROXIES` | `false`, trống | Trình duyệt của crawler |
+| `PLAYWRIGHT_SETTLE_TIME` | `10s` | Thời gian chờ script của trang sau khi tải |
+| `PLAYWRIGHT_BLOCK_RESOURCES` | `true` | Chặn tải ảnh, media, font để giảm CPU |
+| `PLAYWRIGHT_PROXY_COOLDOWN` | `5m` | Proxy lỗi kết nối bị bỏ qua trong khoảng này, worker chuyển sang proxy khác |
 | `EUREKA_ENABLED`, `EUREKA_URL` | `true`, `http://localhost:8761/eureka/` | Đăng ký discovery |
 | `STRUCTURE_DISCOVERY_ENABLED` | `false` | Bật tự tìm XPath cho domain chưa có cấu hình |
 | `GEMINI_API_KEY` | trống | Một hoặc nhiều key, cách nhau bằng dấu phẩy |

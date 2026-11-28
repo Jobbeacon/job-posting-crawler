@@ -1,5 +1,6 @@
 package org.example.jobpostingcrawler.worker;
 
+import com.microsoft.playwright.PlaywrightException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.jobpostingcrawler.config.CrawlerProperties;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +56,9 @@ public class CrawlWorker implements SmartLifecycle {
     private final AtomicInteger activeWorkers = new AtomicInteger(0);
     private ExecutorService executor;
     private Set<String> allowedDomains = Set.of();
+    // Browser failures per URL since its last successful fetch; in memory only, so a restart resets them.
+    private final Map<String, Integer> fetchAttempts = new ConcurrentHashMap<>();
+    private static final int MAX_FETCH_ATTEMPTS = 3;
 
     private Counter urlsCrawledCounter;
     private Counter jobsExtractedCounter;
@@ -204,10 +209,15 @@ public class CrawlWorker implements SmartLifecycle {
             try {
                 document = fetcher.getDocument(url);
             } catch (FetchException e) {
+                fetchAttempts.remove(url);
                 log.warn("Fetch failed url={} status={}", e.getUrl(), e.getStatusCode());
                 errorsCounter.increment();
                 return true;
+            } catch (PlaywrightException e) {
+                handleBrowserFailure(crawlUrl, e);
+                return true;
             }
+            fetchAttempts.remove(url);
 
             urlsCrawledCounter.increment();
 
@@ -247,6 +257,36 @@ public class CrawlWorker implements SmartLifecycle {
         } finally {
             activeWorkers.decrementAndGet();
         }
+    }
+
+    /**
+     * Navigation failed inside the browser (proxy down, timeout, crash): the browser of this thread is replaced,
+     * with another proxy when the proxy was the cause, and the URL goes back to the frontier instead of being lost.
+     */
+    private void handleBrowserFailure(CrawlUrl crawlUrl, PlaywrightException e) {
+        errorsCounter.increment();
+        String url = crawlUrl.url();
+        boolean proxyFailure = Fetcher.isProxyFailure(e);
+        fetcher.recoverFromFailure(e);
+
+        int attempts = fetchAttempts.merge(url, 1, Integer::sum);
+        String reason = firstLine(e.getMessage());
+        if (attempts >= MAX_FETCH_ATTEMPTS) {
+            fetchAttempts.remove(url);
+            log.warn("Dropping url={} after {} failed attempts (proxy={}): {}", url, attempts, proxyFailure, reason);
+            return;
+        }
+        queueService.push(crawlUrl);
+        log.warn("Fetch attempt {}/{} failed, url requeued={} (proxy={}): {}",
+                attempts, MAX_FETCH_ATTEMPTS, url, proxyFailure, reason);
+    }
+
+    private static String firstLine(String message) {
+        if (message == null) {
+            return "";
+        }
+        return message.lines().map(String::strip).filter(line -> line.startsWith("message="))
+                .findFirst().orElse(message.lines().findFirst().orElse(""));
     }
 
     private Set<String> loadAllowedDomains() {

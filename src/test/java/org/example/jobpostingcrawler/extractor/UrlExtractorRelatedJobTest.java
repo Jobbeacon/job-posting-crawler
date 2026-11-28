@@ -50,10 +50,11 @@ class UrlExtractorRelatedJobTest {
         );
 
         UrlExtractor extractor = new UrlExtractor();
-        ProxyProvider proxyProvider = new ProxyProvider(new PlaywrightProperties(false, List.of()));
+        PlaywrightProperties playwrightProperties = new PlaywrightProperties(false, List.of(), null, null, null);
+        ProxyProvider proxyProvider = new ProxyProvider(playwrightProperties);
         Document document;
         try {
-            document = new Fetcher(proxyProvider).getDocument(JOB_DETAIL_URL.trim());
+            document = new Fetcher(playwrightProperties, proxyProvider).getDocument(JOB_DETAIL_URL.trim());
         } catch (FetchException e) {
             assumeTrue(e.getStatusCode() < 400 || e.getStatusCode() >= 500,
                     "Trang job không còn (HTTP " + e.getStatusCode() + "), thay JOB_DETAIL_URL rồi chạy lại");
